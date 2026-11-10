@@ -45,14 +45,13 @@
       <section class="intro" id="proyecto">
         <div class="kicker">Tesis · Registro vegetal</div>
         <h1>Floretum</h1>
-        <p>Un espacio para documentar y presentar tres scans de plantas realizados con Scaniverse. Aquí se puede agregar una breve descripción del proyecto o de cada ejemplar.</p>
+        <p>Un espacio para documentar y presentar dos scans de plantas realizados con Scaniverse. Aquí se puede agregar una breve descripción del proyecto o de cada ejemplar.</p>
       </section>
       <section id="scans">
-        <div class="section-head"><h2>Tres scans</h2><span class="count">01 — 03</span></div>
+        <div class="section-head"><h2>Dos scans</h2><span class="count">01 — 02</span></div>
         <div class="scans">
           <article class="scan-card"><div class="viewer" data-ply="scans-clean/scan-01.ply"><canvas class="ply-canvas"></canvas><div class="viewer-inner"><strong>Scan 01</strong><span>Vista central depurada · 4.0 MB</span><br><button class="load-scan">Cargar scan</button></div></div><div class="info"><h3>Ejemplar 01</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
           <article class="scan-card"><div class="viewer" data-ply="scans-clean/scan-02.ply"><canvas class="ply-canvas"></canvas><div class="viewer-inner"><strong>Scan 02</strong><span>Vista central depurada · 3.9 MB</span><br><button class="load-scan">Cargar scan</button></div></div><div class="info"><h3>Ejemplar 02</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
-          <article class="scan-card"><div class="viewer" data-ply="scans-clean/scan-03.ply"><canvas class="ply-canvas"></canvas><div class="viewer-inner"><strong>Scan 03</strong><span>Vista central depurada · 3.4 MB</span><br><button class="load-scan">Cargar scan</button></div></div><div class="info"><h3>Ejemplar 03</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
         </div>
       </section>
     </main>
@@ -80,7 +79,7 @@
           const geometry = await new PLYLoader().loadAsync(viewer.dataset.ply); geometry.computeVertexNormals(); geometry.center();
           const box = new THREE.Box3().setFromBufferAttribute(geometry.getAttribute('position')); const size = box.getSize(new THREE.Vector3()).length();
           const material = new THREE.PointsMaterial({size:Math.max(size / 450, .003), vertexColors:!!geometry.getAttribute('color'), color:0x52745c, sizeAttenuation:true});
-          const points = new THREE.Points(geometry, material); scene.add(points); camera.position.set(0, size * .15, size * 1.1); controls.target.set(0,0,0); controls.update(); viewer.classList.add('loaded');
+          const points = new THREE.Points(geometry, material); points.rotation.z = Math.PI; scene.add(points); camera.position.set(0, size * .15, size * 1.1); controls.target.set(0,0,0); controls.update(); viewer.classList.add('loaded');
           const render = () => { requestAnimationFrame(render); controls.update(); renderer.render(scene,camera); }; render();
           new ResizeObserver(() => { const w=viewer.clientWidth,h=viewer.clientHeight; camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false); }).observe(viewer);
         } catch (error) { button.disabled=false; button.textContent='No se pudo cargar'; console.error(error); }
