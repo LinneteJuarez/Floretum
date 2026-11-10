@@ -23,8 +23,12 @@
     .count { color:var(--muted); font-size:13px; }
     .scans { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; padding-bottom:90px; }
     .scan-card { border:1px solid var(--line); background:white; }
-    .viewer { min-height:290px; display:grid; place-items:center; background:var(--soft); color:var(--muted); text-align:center; padding:24px; }
-    .viewer-inner { width:100%; border:1px dashed #bcc9bd; padding:45px 18px; }
+    .viewer { min-height:290px; position:relative; display:grid; place-items:center; background:var(--soft); color:var(--muted); overflow:hidden; }
+    .viewer-inner { width:100%; padding:45px 18px; text-align:center; }
+    .ply-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+    .load-scan { position:relative; z-index:1; border:1px solid #bcc9bd; background:rgba(251,252,250,.92); color:var(--ink); padding:10px 14px; font:inherit; font-size:12px; cursor:pointer; }
+    .load-scan:hover { background:var(--ink); color:white; }
+    .viewer.loaded .viewer-inner { display:none; }
     .viewer strong { display:block; color:var(--ink); font-family:Georgia, serif; font-size:19px; font-weight:normal; margin-bottom:8px; }
     .viewer span { display:block; font-size:12px; line-height:1.5; }
     .info { padding:17px 18px 19px; }
@@ -46,13 +50,39 @@
       <section id="scans">
         <div class="section-head"><h2>Tres scans</h2><span class="count">01 — 03</span></div>
         <div class="scans">
-          <article class="scan-card"><div class="viewer"><div class="viewer-inner"><strong>Scan 01</strong><span>Inserta aquí el visor 3D o el enlace de tu primer scan.</span></div></div><div class="info"><h3>Ejemplar 01</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
-          <article class="scan-card"><div class="viewer"><div class="viewer-inner"><strong>Scan 02</strong><span>Inserta aquí el visor 3D o el enlace de tu segundo scan.</span></div></div><div class="info"><h3>Ejemplar 02</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
-          <article class="scan-card"><div class="viewer"><div class="viewer-inner"><strong>Scan 03</strong><span>Inserta aquí el visor 3D o el enlace de tu tercer scan.</span></div></div><div class="info"><h3>Ejemplar 03</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
+          <article class="scan-card"><div class="viewer" data-ply="scans-final/scan-01.ply"><canvas class="ply-canvas"></canvas><div class="viewer-inner"><strong>Scan 01</strong><span>Nube de puntos · 4.9 MB</span><br><button class="load-scan">Cargar scan</button></div></div><div class="info"><h3>Ejemplar 01</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
+          <article class="scan-card"><div class="viewer" data-ply="scans-final/scan-02.ply"><canvas class="ply-canvas"></canvas><div class="viewer-inner"><strong>Scan 02</strong><span>Nube de puntos · 4.7 MB</span><br><button class="load-scan">Cargar scan</button></div></div><div class="info"><h3>Ejemplar 02</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
+          <article class="scan-card"><div class="viewer" data-ply="scans-final/scan-03.ply"><canvas class="ply-canvas"></canvas><div class="viewer-inner"><strong>Scan 03</strong><span>Nube de puntos · 4.1 MB</span><br><button class="load-scan">Cargar scan</button></div></div><div class="info"><h3>Ejemplar 03</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
         </div>
       </section>
     </main>
     <footer><span>Floretum · Tesis</span><span>Scans realizados con Scaniverse</span></footer>
   </div>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.169.0/build/three.module.js';
+    import { PLYLoader } from 'https://unpkg.com/three@0.169.0/examples/jsm/loaders/PLYLoader.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.169.0/examples/jsm/controls/OrbitControls.js';
+
+    document.querySelectorAll('.viewer[data-ply]').forEach(viewer => {
+      const button = viewer.querySelector('.load-scan');
+      button.addEventListener('click', async () => {
+        button.disabled = true; button.textContent = 'Cargando…';
+        const canvas = viewer.querySelector('canvas');
+        const scene = new THREE.Scene(); scene.background = new THREE.Color('#f0f4ef');
+        const camera = new THREE.PerspectiveCamera(45, viewer.clientWidth / viewer.clientHeight, 0.01, 1000);
+        const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true}); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(viewer.clientWidth, viewer.clientHeight, false);
+        const controls = new OrbitControls(camera, canvas); controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = .7;
+        const light = new THREE.HemisphereLight(0xffffff, 0x6b806e, 2); scene.add(light);
+        try {
+          const geometry = await new PLYLoader().loadAsync(viewer.dataset.ply); geometry.computeVertexNormals(); geometry.center();
+          const box = new THREE.Box3().setFromBufferAttribute(geometry.getAttribute('position')); const size = box.getSize(new THREE.Vector3()).length();
+          const material = new THREE.PointsMaterial({size:Math.max(size / 450, .003), vertexColors:!!geometry.getAttribute('color'), color:0x52745c, sizeAttenuation:true});
+          const points = new THREE.Points(geometry, material); scene.add(points); camera.position.set(0, size * .15, size * 1.1); controls.target.set(0,0,0); controls.update(); viewer.classList.add('loaded');
+          const render = () => { requestAnimationFrame(render); controls.update(); renderer.render(scene,camera); }; render();
+          new ResizeObserver(() => { const w=viewer.clientWidth,h=viewer.clientHeight; camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false); }).observe(viewer);
+        } catch (error) { button.disabled=false; button.textContent='No se pudo cargar'; console.error(error); }
+      });
+    });
+  </script>
 </body>
 </html>
