@@ -58,8 +58,11 @@
     </main>
     <footer><span>Floretum · Tesis</span><span>Scans realizados con Scaniverse</span></footer>
   </div>
+  <script type="importmap">
+    {"imports":{"three":"https://unpkg.com/three@0.169.0/build/three.module.js"}}
+  </script>
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.169.0/build/three.module.js';
+    import * as THREE from 'three';
     import { PLYLoader } from 'https://unpkg.com/three@0.169.0/examples/jsm/loaders/PLYLoader.js';
     import { OrbitControls } from 'https://unpkg.com/three@0.169.0/examples/jsm/controls/OrbitControls.js';
 
