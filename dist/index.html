@@ -3,83 +3,56 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SCAN / FIELD — Galería de splats</title>
-  <meta name="description" content="Una galería de espacios escaneados con Scaniverse." />
+  <title>Floretum — Tesis</title>
+  <meta name="description" content="Registro de scans de plantas para la tesis Floretum." />
   <style>
-    :root { --ink:#18201e; --muted:#68716d; --paper:#f2efe7; --card:#fbfaf6; --lime:#d4ff4f; --line:rgba(24,32,30,.15); --orange:#ff744f; }
+    :root { --ink:#26332c; --muted:#6d776f; --line:#d9ded8; --paper:#fbfcfa; --soft:#f0f4ef; --accent:#52745c; }
     * { box-sizing:border-box; }
-    body { margin:0; color:var(--ink); background:var(--paper); font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }
-    a { color:inherit; text-decoration:none; }
-    .wrap { width:min(1180px, calc(100% - 44px)); margin:auto; }
-    header { display:flex; justify-content:space-between; align-items:center; padding:24px 0 18px; border-bottom:1px solid var(--line); }
-    .mark { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.06em; font-size:13px; }
-    .mark-dot { width:13px; height:13px; border-radius:50%; background:var(--orange); box-shadow: 4px -3px 0 var(--lime); }
-    nav { display:flex; gap:24px; color:var(--muted); font-size:13px; }
-    .hero { display:grid; grid-template-columns:1.2fr .8fr; gap:40px; padding:82px 0 74px; align-items:end; }
-    .eyebrow { text-transform:uppercase; letter-spacing:.16em; font-size:11px; color:var(--muted); margin-bottom:22px; }
-    h1 { font-size:clamp(58px, 9vw, 124px); line-height:.84; letter-spacing:-.085em; margin:0; font-weight:850; max-width:780px; }
-    .hero-copy { max-width:330px; justify-self:end; color:var(--muted); line-height:1.55; font-size:15px; }
-    .hero-copy strong { color:var(--ink); font-weight:650; }
-    .intro-line { margin-top:25px; padding-top:17px; border-top:1px solid var(--line); display:flex; justify-content:space-between; gap:12px; color:var(--ink); font-size:12px; }
-    .intro-line span:last-child { color:var(--muted); }
-    .toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
-    .toolbar h2 { font-size:14px; margin:0; letter-spacing:.04em; }
-    .filters { display:flex; gap:7px; flex-wrap:wrap; }
-    button { border:1px solid var(--line); border-radius:999px; background:transparent; color:var(--muted); padding:9px 14px; font:inherit; font-size:11px; cursor:pointer; transition:.2s ease; }
-    button:hover, button.active { background:var(--ink); border-color:var(--ink); color:var(--paper); }
-    .grid { display:grid; grid-template-columns:repeat(12, 1fr); gap:16px; padding-bottom:80px; }
-    .card { grid-column:span 4; background:var(--card); border:1px solid var(--line); min-height:345px; display:flex; flex-direction:column; overflow:hidden; cursor:pointer; transition:transform .25s ease, box-shadow .25s ease; }
-    .card:nth-child(2) { grid-column:span 5; }
-    .card:nth-child(3) { grid-column:span 3; }
-    .card:nth-child(4) { grid-column:span 5; }
-    .card:nth-child(5) { grid-column:span 3; }
-    .card:nth-child(6) { grid-column:span 4; }
-    .card:hover { transform:translateY(-5px); box-shadow:0 15px 35px rgba(24,32,30,.12); }
-    .visual { position:relative; height:250px; overflow:hidden; background:#202a27; }
-    .visual::before, .visual::after { content:""; position:absolute; inset:12% 10%; border:1px solid rgba(255,255,255,.3); transform:rotate(-11deg) skewY(5deg); }
-    .visual::after { inset:24% 20%; transform:rotate(17deg) skewY(-7deg); border-color:rgba(212,255,79,.65); }
-    .scan { position:absolute; width:9px; height:9px; border-radius:50%; background:var(--lime); box-shadow: 35px 30px 0 #fd8f5e, -45px 55px 0 #efe6cb, 80px 75px 0 #e8b9ac, -70px -15px 0 #73a7a1, 115px 20px 0 #d4ff4f, -20px 110px 0 #fbfaf6, 140px 100px 0 #ff744f; opacity:.88; }
-    .visual.a { background:radial-gradient(circle at 60% 40%,#6b867c 0,#263632 45%,#17211f 100%); } .visual.a .scan { left:45%; top:40%; transform:scale(1.25); }
-    .visual.b { background:radial-gradient(circle at 30% 30%,#b46c51 0,#523c3c 48%,#202222 100%); } .visual.b .scan { left:32%; top:55%; transform:scale(1.6); }
-    .visual.c { background:radial-gradient(circle at 70% 20%,#9daf8a 0,#45564b 44%,#202a27 100%); } .visual.c .scan { left:58%; top:31%; transform:scale(.9); }
-    .visual.d { background:radial-gradient(circle at 50% 48%,#7d8da3 0,#323d4e 44%,#1d2631 100%); } .visual.d .scan { left:46%; top:48%; transform:scale(2); }
-    .visual.e { background:radial-gradient(circle at 20% 80%,#d6a47d 0,#6b5647 40%,#292a29 100%); } .visual.e .scan { left:35%; top:45%; transform:scale(1.15); }
-    .visual.f { background:radial-gradient(circle at 70% 70%,#827dba 0,#383746 48%,#202222 100%); } .visual.f .scan { left:58%; top:50%; transform:scale(1.5); }
-    .card-info { padding:16px 17px 18px; display:flex; justify-content:space-between; align-items:end; gap:10px; flex:1; }
-    .card h3 { margin:0 0 6px; font-size:17px; letter-spacing:-.035em; } .meta { color:var(--muted); font-size:11px; }
-    .arrow { width:28px; height:28px; border:1px solid var(--line); display:grid; place-items:center; border-radius:50%; font-size:16px; }
-    footer { border-top:1px solid var(--line); padding:22px 0 34px; display:flex; justify-content:space-between; color:var(--muted); font-size:12px; }
-    .modal { position:fixed; inset:0; display:none; place-items:center; background:rgba(24,32,30,.72); padding:20px; z-index:5; } .modal.open { display:grid; }
-    .modal-box { width:min(680px,100%); background:var(--paper); padding:28px; position:relative; } .modal-box h2 { margin:0 0 8px; font-size:34px; letter-spacing:-.05em; } .modal-box p { color:var(--muted); max-width:520px; line-height:1.5; }
-    .close { position:absolute; right:18px; top:18px; border:0; padding:5px 10px; font-size:20px; } .close:hover { background:transparent; color:var(--ink); }
-    .drop { border:1px dashed var(--line); padding:30px; margin-top:22px; color:var(--muted); font-size:13px; } .drop code { color:var(--ink); }
-    @media (max-width:760px) { .wrap{width:min(100% - 28px,1180px)} header{padding-top:18px} nav{gap:12px}.hero{grid-template-columns:1fr;gap:28px;padding:60px 0 48px}.hero-copy{justify-self:start}.card,.card:nth-child(n){grid-column:span 12}.visual{height:230px}.toolbar{align-items:flex-start;gap:18px;flex-direction:column}footer{gap:16px;flex-direction:column} }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:Arial, Helvetica, sans-serif; }
+    .wrap { width:min(1080px, calc(100% - 40px)); margin:auto; }
+    header { display:flex; justify-content:space-between; align-items:center; padding:26px 0; border-bottom:1px solid var(--line); }
+    .brand { font-family:Georgia, serif; font-size:24px; letter-spacing:-.03em; }
+    nav { display:flex; gap:22px; color:var(--muted); font-size:13px; }
+    nav a:hover { color:var(--ink); }
+    .intro { padding:88px 0 72px; max-width:660px; }
+    .kicker { color:var(--accent); font-size:12px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:18px; }
+    h1 { font-family:Georgia, serif; font-weight:normal; font-size:clamp(48px, 8vw, 82px); line-height:.95; letter-spacing:-.06em; margin:0 0 24px; }
+    .intro p { color:var(--muted); max-width:500px; line-height:1.65; margin:0; font-size:16px; }
+    .section-head { display:flex; justify-content:space-between; align-items:baseline; padding-bottom:15px; border-bottom:1px solid var(--line); margin-bottom:18px; }
+    h2 { font-size:14px; font-weight:normal; letter-spacing:.1em; text-transform:uppercase; margin:0; }
+    .count { color:var(--muted); font-size:13px; }
+    .scans { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; padding-bottom:90px; }
+    .scan-card { border:1px solid var(--line); background:white; }
+    .viewer { min-height:290px; display:grid; place-items:center; background:var(--soft); color:var(--muted); text-align:center; padding:24px; }
+    .viewer-inner { width:100%; border:1px dashed #bcc9bd; padding:45px 18px; }
+    .viewer strong { display:block; color:var(--ink); font-family:Georgia, serif; font-size:19px; font-weight:normal; margin-bottom:8px; }
+    .viewer span { display:block; font-size:12px; line-height:1.5; }
+    .info { padding:17px 18px 19px; }
+    .info h3 { font-family:Georgia, serif; font-size:21px; font-weight:normal; margin:0 0 7px; }
+    .info p { color:var(--muted); font-size:12px; line-height:1.5; margin:0; }
+    footer { border-top:1px solid var(--line); padding:22px 0 30px; color:var(--muted); font-size:12px; display:flex; justify-content:space-between; }
+    @media (max-width:700px) { .wrap{width:min(100% - 28px,1080px)} header{padding:18px 0} nav{gap:12px}.intro{padding:62px 0 54px}.scans{grid-template-columns:1fr;gap:16px}.viewer{min-height:220px}footer{display:block;line-height:1.8} }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header><a class="mark" href="#top"><span class="mark-dot"></span> SCAN / FIELD</a><nav><a href="#works">Works</a><a href="#about">About</a><a href="mailto:hola@scanfield.studio">Contact</a></nav></header>
-    <main id="top">
-      <section class="hero"><div><div class="eyebrow">Archivo de espacios capturados · 2026</div><h1>mundos<br><em>en puntos.</em></h1></div><div class="hero-copy"><strong>Una colección de lugares reales, reconstruidos como nubes de memoria.</strong><br><br>Explora una selección de splats hechos con Scaniverse. Cada pieza conserva la atmósfera, el ruido y la escala del momento capturado.<div class="intro-line"><span>06 piezas</span><span>MX / online</span></div></div></section>
-      <section id="works"><div class="toolbar"><h2>EXPLORAR LA COLECCIÓN</h2><div class="filters"><button class="active" data-filter="all">Todos</button><button data-filter="interior">Interiores</button><button data-filter="exterior">Exteriores</button></div></div>
-        <div class="grid">
-          <article class="card" data-type="interior" data-title="Casa de luz" data-desc="Un interior doméstico capturado durante la hora azul."><div class="visual a"><i class="scan"></i></div><div class="card-info"><div><h3>Casa de luz</h3><div class="meta">01 / INTERIOR · 2026</div></div><span class="arrow">↗</span></div></article>
-          <article class="card" data-type="exterior" data-title="Patio naranja" data-desc="Texturas cálidas, sombra dura y geometrías del patio al mediodía."><div class="visual b"><i class="scan"></i></div><div class="card-info"><div><h3>Patio naranja</h3><div class="meta">02 / EXTERIOR · 2026</div></div><span class="arrow">↗</span></div></article>
-          <article class="card" data-type="exterior" data-title="Jardín después de lluvia" data-desc="Un jardín suspendido entre hojas, humedad y luz difusa."><div class="visual c"><i class="scan"></i></div><div class="card-info"><div><h3>Jardín después de lluvia</h3><div class="meta">03 / EXTERIOR · 2026</div></div><span class="arrow">↗</span></div></article>
-          <article class="card" data-type="interior" data-title="Estudio 04" data-desc="Un pequeño estudio de trabajo visto como un mapa de superficies."><div class="visual d"><i class="scan"></i></div><div class="card-info"><div><h3>Estudio 04</h3><div class="meta">04 / INTERIOR · 2026</div></div><span class="arrow">↗</span></div></article>
-          <article class="card" data-type="exterior" data-title="Banqueta 7PM" data-desc="La calle, el tráfico y las sombras largas de una tarde cualquiera."><div class="visual e"><i class="scan"></i></div><div class="card-info"><div><h3>Banqueta 7PM</h3><div class="meta">05 / EXTERIOR · 2026</div></div><span class="arrow">↗</span></div></article>
-          <article class="card" data-type="interior" data-title="Sala de espera" data-desc="Un espacio de tránsito convertido en una pequeña constelación."><div class="visual f"><i class="scan"></i></div><div class="card-info"><div><h3>Sala de espera</h3><div class="meta">06 / INTERIOR · 2026</div></div><span class="arrow">↗</span></div></article>
+    <header><a class="brand" href="#inicio">Floretum</a><nav><a href="#scans">Scans</a><a href="#proyecto">Proyecto</a></nav></header>
+    <main id="inicio">
+      <section class="intro" id="proyecto">
+        <div class="kicker">Tesis · Registro vegetal</div>
+        <h1>Floretum</h1>
+        <p>Un espacio para documentar y presentar tres scans de plantas realizados con Scaniverse. Aquí se puede agregar una breve descripción del proyecto o de cada ejemplar.</p>
+      </section>
+      <section id="scans">
+        <div class="section-head"><h2>Tres scans</h2><span class="count">01 — 03</span></div>
+        <div class="scans">
+          <article class="scan-card"><div class="viewer"><div class="viewer-inner"><strong>Scan 01</strong><span>Inserta aquí el visor 3D o el enlace de tu primer scan.</span></div></div><div class="info"><h3>Ejemplar 01</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
+          <article class="scan-card"><div class="viewer"><div class="viewer-inner"><strong>Scan 02</strong><span>Inserta aquí el visor 3D o el enlace de tu segundo scan.</span></div></div><div class="info"><h3>Ejemplar 02</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
+          <article class="scan-card"><div class="viewer"><div class="viewer-inner"><strong>Scan 03</strong><span>Inserta aquí el visor 3D o el enlace de tu tercer scan.</span></div></div><div class="info"><h3>Ejemplar 03</h3><p>Nombre común / nombre científico<br>Ubicación · Fecha</p></div></article>
         </div>
       </section>
     </main>
-    <footer id="about"><span>SCAN / FIELD © 2026</span><span>Hecho con Scaniverse · Próximamente: visores 3D</span></footer>
+    <footer><span>Floretum · Tesis</span><span>Scans realizados con Scaniverse</span></footer>
   </div>
-  <div class="modal" id="modal"><div class="modal-box"><button class="close" aria-label="Cerrar">×</button><div class="eyebrow">Vista de pieza</div><h2 id="modalTitle"></h2><p id="modalDesc"></p><div class="drop">Aquí puedes insertar tu visor o archivo: <code>&lt;model-viewer&gt;</code>, iframe de Sketchfab, o un enlace a tu splat.</div></div></div>
-  <script>
-    const buttons=[...document.querySelectorAll('[data-filter]')], cards=[...document.querySelectorAll('.card')];
-    buttons.forEach(btn=>btn.addEventListener('click',()=>{buttons.forEach(b=>b.classList.remove('active'));btn.classList.add('active');const f=btn.dataset.filter;cards.forEach(c=>c.style.display=f==='all'||c.dataset.type===f?'flex':'none')}));
-    const modal=document.querySelector('#modal'); cards.forEach(card=>card.addEventListener('click',()=>{document.querySelector('#modalTitle').textContent=card.dataset.title;document.querySelector('#modalDesc').textContent=card.dataset.desc;modal.classList.add('open')}));
-    document.querySelector('.close').addEventListener('click',()=>modal.classList.remove('open')); modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('open')});
-  </script>
 </body>
 </html>
