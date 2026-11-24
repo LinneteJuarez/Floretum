@@ -3,3 +3,8 @@ dist/scans-lite/
 dist/scans-lite2/
 dist/scans-web/
 dist/scans-web2/
+
+node_modules/
+public/scans/*.ksplat
+public/scans/*.points.bin
+

@@ -1,0 +1,40 @@
+:root { font-family: Arial, Helvetica, sans-serif; color: #26332c; background: #fbfcfa; font-synthesis: none; text-rendering: optimizeLegibility; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+a { color: inherit; }
+.page { width: min(1080px, calc(100% - 40px)); margin: 0 auto; }
+.topbar { height: 78px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #d9ded8; font-size: .9rem; }
+.brand { font: 1.6rem Georgia, serif; text-decoration: none; }
+.intro { padding: 52px 0 36px; max-width: 650px; }
+.eyebrow { color: #52745c; text-transform: uppercase; letter-spacing: .12em; font-size: .78rem; }
+h1 { font: normal clamp(3rem, 8vw, 5rem)/.95 Georgia, serif; letter-spacing: -.055em; margin: 1rem 0; }
+.intro > p:last-child { color: #646f67; font-size: 1.05rem; line-height: 1.65; }
+.sound-work { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 14px 0 18px; margin: 0 0 24px; border-top: 1px solid #e3e6df; border-bottom: 1px solid #e3e6df; }
+.sound-work span { color: #68736a; font-size: .65rem; letter-spacing: .11em; }
+.sound-work p { margin: 5px 0 0; color: #646f67; font-size: .86rem; }
+.sound-work audio { width: min(340px, 46%); height: 38px; }
+.specimens { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 820px; margin: 0 auto; padding-bottom: 64px; }
+.specimen { min-width: 0; border: 1px solid #d9ded8; background: #fff; }
+.viewer { position: relative; isolation: isolate; width: 100%; height: clamp(300px, 42vw, 440px); overflow: hidden; background: linear-gradient(180deg, #f5f5f0 0 68%, #efeee8 100%); }
+.viewer::before { content: ""; position: absolute; z-index: 0; inset: 0; background: radial-gradient(ellipse at 50% 49%, rgba(222, 208, 176, .26), transparent 54%); pointer-events: none; }
+.viewer::after { content: ""; position: absolute; z-index: 0; left: 50%; top: 67%; width: min(54%, 230px); height: 14px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(48, 43, 34, .18), rgba(48, 43, 34, .06) 44%, transparent 74%); pointer-events: none; }
+.viewer canvas { position: absolute !important; z-index: 1; inset: 0 !important; width: 100% !important; height: 100% !important; display: block; }
+.viewer.is-ready { cursor: pointer; }
+.viewer-index { position: absolute; z-index: 3; top: 16px; left: 18px; padding: 5px 7px; color: #68736a; background: rgba(245, 245, 240, .72); font-size: .65rem; letter-spacing: .11em; }
+.viewer-prompt { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; background: transparent; }
+.viewer-prompt strong { font: normal 1.35rem Georgia, serif; }
+.viewer-prompt span { color: #6d776f; font-size: .9rem; }
+button { border: 1px solid #bcc9bd; background: #fbfcfa; color: #26332c; padding: 11px 16px; font: inherit; cursor: pointer; }
+button:hover:not(:disabled) { color: white; background: #26332c; }
+button:disabled { opacity: .7; cursor: wait; }
+.caption { display: grid; gap: 14px; padding: 18px 20px 20px; border-top: 1px solid #e6e8e2; }
+.caption h2 { margin: 0 0 8px; font: normal 1.4rem Georgia, serif; }
+.caption p { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; color: #6d776f; font-size: .88rem; }
+.sonification-control { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sonification-hint { margin: 0; color: #6d776f; font-size: .85rem; }
+.sonification-control button { padding: 7px 12px; font-size: .8rem; }
+.viewer-modes { display: flex; gap: 5px; }
+.viewer-modes button { padding: 7px 10px; border-color: #d9ded8; background: transparent; color: #6d776f; font-size: .75rem; }
+.viewer-modes button.selected { border-color: #bac8ba; background: #edf1eb; color: #26332c; }
+footer { border-top: 1px solid #d9ded8; padding: 22px 0 30px; color: #6d776f; font-size: .8rem; }
+@media (max-width: 700px) { .page { width: min(100% - 28px, 1080px); } .topbar { height: 64px; } .intro { padding: 44px 0 30px; } .specimens { gap: 16px; } .viewer { height: 330px; } }
