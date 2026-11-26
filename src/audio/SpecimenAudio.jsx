@@ -3,6 +3,7 @@ import * as Tone from 'tone';
 import { buildSoundEvents, colorBrightness, loadPointCloud, DURATION } from './sonify.js';
 import { samplePointCloud } from './samplePointCloud.js';
 import { buildRhythm, loadSampleUrls } from './sampleArrangement.js';
+import { loadSoundProfile } from './soundProfile.js';
 
 const SAMPLE_INTERVAL = 85;
 
@@ -62,13 +63,14 @@ export default function SpecimenAudio({
 
     async function prepare() {
       try {
-        const [points, samples] = await Promise.all([
+        const [points, samples, profile] = await Promise.all([
           loadPointCloud(specimen, controller.signal),
           loadSamples(controller.signal),
+          loadSoundProfile(specimen.dataId, controller.signal),
         ]);
         if (controller.signal.aborted) return;
         const events = buildSoundEvents(points, specimen.center);
-        stopPlayback = playLayers(samples, events, points, specimen, host, viewerRef, () => pointer);
+        stopPlayback = playLayers(samples, events, points, specimen, host, viewerRef, () => pointer, profile);
       } catch (error) {
         if (controller.signal.aborted) return;
         controller.abort();
@@ -122,16 +124,16 @@ export default function SpecimenAudio({
   );
 }
 
-function playLayers(buffers, events, points, specimen, host, viewerRef, getPointer) {
+function playLayers(buffers, events, points, specimen, host, viewerRef, getPointer, profile) {
   const output = new Tone.Gain(0).toDestination();
   const bassFilter = new Tone.Filter(700, 'lowpass').connect(output);
   const localPan = new Tone.Panner(0).connect(output);
   const localGain = new Tone.Gain(0).connect(localPan);
   const filter = new Tone.Filter(800, 'lowpass').connect(localGain);
-  const rhythm = buildRhythm(events, DURATION);
+  const rhythm = buildRhythm(events, DURATION, profile?.densidadRitmica);
   let chord = rhythm[0].chord;
   let lastGuitar = -Infinity;
-  let previousSample = null;
+  let wasHovering = false;
   let previousPointer = null;
   let pointerSpeed = 0;
   const samples = new Map(buffers.map(([name, buffer]) => {
@@ -141,18 +143,21 @@ function playLayers(buffers, events, points, specimen, host, viewerRef, getPoint
     return [name, player];
   }));
 
-  function playSample(name, time, volume) {
+  function playSample(name, time, volume, duration) {
     const player = samples.get(name);
     player.volume.setValueAtTime(volume, time);
-    player.start(time);
+    const playbackDuration = duration === undefined ? undefined : Math.min(duration, player.buffer.duration);
+    player.start(time, undefined, playbackDuration);
   }
 
   const transport = Tone.getTransport();
   const part = new Tone.Part((time, step) => {
     chord = step.chord;
-    const drumLevel = step.drum === 'hat' ? -35 + step.brightness * 18 : -23;
     bassFilter.frequency.linearRampToValueAtTime(180 * 12 ** step.brightness, time);
-    playSample(step.drum, time, drumLevel + step.accent * 7);
+    if (step.drum) {
+      const drumLevel = step.drum === 'hat' ? -35 + step.brightness * 18 : -23;
+      playSample(step.drum, time, drumLevel + step.accent * 7);
+    }
     if (step.bass) playSample(`bass-${chord}`, time, -21 + step.accent * 4);
   }, rhythm);
   part.loopEnd = DURATION;
@@ -170,8 +175,8 @@ function playLayers(buffers, events, points, specimen, host, viewerRef, getPoint
       : null;
 
     if (!region) {
-      if (previousSample) localGain.gain.rampTo(0, 0.12);
-      previousSample = null;
+      if (wasHovering) localGain.gain.rampTo(0, 0.12);
+      wasHovering = false;
       previousPointer = null;
       pointerSpeed = 0;
       return;
@@ -181,7 +186,6 @@ function playLayers(buffers, events, points, specimen, host, viewerRef, getPoint
     const greenDominance = Math.max(0, region.green - Math.max(region.red, region.blue));
     const proximity = Math.min(1, specimen.cameraDistance / Math.max(region.depth, 0.001));
     const guitar = brightness > 0.38 && greenDominance < 0.04 ? 'acoustic' : 'electric';
-    const sample = `${guitar}-${chord}`;
     const now = Tone.now();
     if (previousPointer) {
       const distance = Math.hypot(pointer.x - previousPointer.x, pointer.y - previousPointer.y);
@@ -195,9 +199,20 @@ function playLayers(buffers, events, points, specimen, host, viewerRef, getPoint
 
     const motion = Math.min(1, pointerSpeed / 650);
     const retriggerAfter = 0.95 - 0.71 * motion - 0.04 * region.spread;
-    if (now - lastGuitar >= (previousSample ? retriggerAfter : 0.2)) {
-      playSample(sample, now, -14);
-      previousSample = sample;
+    if (now - lastGuitar >= (wasHovering ? retriggerAfter : 0.2)) {
+      if (profile) {
+        const acoustic = profile.mezclaAcustica;
+        const electric = 1 - acoustic;
+        if (acoustic > 0) {
+          playSample(`acoustic-${chord}`, now, -14 + Tone.gainToDb(acoustic), profile.duracionCapaSeg);
+        }
+        if (electric > 0) {
+          playSample(`electric-${chord}`, now, -14 + Tone.gainToDb(electric), profile.duracionCapaSeg);
+        }
+      } else {
+        playSample(`${guitar}-${chord}`, now, -14);
+      }
+      wasHovering = true;
       lastGuitar = now;
     }
   }
