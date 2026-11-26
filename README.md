@@ -1,0 +1,43 @@
+# Floretum
+
+Archivo visual de dalias construido con React, Vite, Three.js y GaussianSplats3D.
+
+## Estructura rápida
+
+- `src/main.jsx`: composición de la página, navegación, carga del Gaussian y comportamiento de las máscaras.
+- `src/data/specimens.js`: catálogo editable de especies y sus datos botánicos.
+- `src/shaders/pointCloud.js`: material GPU de la nube de puntos, tamaño de partícula y ruido animado.
+- `src/style.css`: sistema visual, layout, estados, máscaras y responsive.
+- `public/scans/`: archivos `.ksplat` y `.points.bin` usados por cada espécimen.
+- `scripts/convert-splats.mjs`: convierte los `.ply` fuente en Gaussian splats y nubes de puntos.
+
+## Editar una especie
+
+1. Coloca el Gaussian `.ksplat` y el archivo `.points.bin` en `public/scans/`.
+2. Agrega un objeto en `src/data/specimens.js`.
+3. Mantén el mismo `center` para ambos archivos: se usa para alinear la nube con el Gaussian.
+4. Ajusta `cameraDistance` solo si el encuadre inicial de la especie lo necesita.
+
+## Editar el efecto de partículas
+
+Los valores principales están al inicio de `src/shaders/pointCloud.js`:
+
+- `POINT_CLOUD_POINT_SIZE`: reduce o aumenta el tamaño de cada punto.
+- `POINT_CLOUD_RENDER_FPS`: controla la frecuencia de actualización.
+- `noise * 0.0008`: controla cuánto se mueve cada partícula.
+- `POINT_CLOUD_CAMERA_SCALE`: compensa la diferencia visual entre los centros de puntos y el volumen de los splats.
+
+El ruido corre en el shader de la GPU para evitar recalcular las posiciones en React o JavaScript.
+
+## Ejecutar
+
+```bash
+npm install
+npm run dev -- --host 0.0.0.0 --port 3002
+```
+
+Para validar una versión de producción:
+
+```bash
+npm run build
+```

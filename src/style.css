@@ -1,3 +1,4 @@
+/* Sistema visual: tipografías, colores, espaciado y sombras. */
 :root {
   --font-display: 'Hatton', Georgia, serif;
   --font-body: 'Hanken Grotesk', Arial, sans-serif;
@@ -40,6 +41,7 @@ body { margin: 0; min-width: 320px; overflow-x: hidden; background: var(--color-
 a { color: inherit; }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--color-accent-yellow); outline-offset: 3px; }
 .page { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding-top: 78px; }
+/* Navegación fija y estado activo. */
 .topbar { position: fixed; z-index: 10; inset: 0 0 auto; height: 78px; border-bottom: 1px solid rgba(53, 66, 57, .72); background: rgba(16, 20, 17, .78); backdrop-filter: blur(18px); font-size: .9rem; }
 .topbar-inner { width: min(1080px, calc(100% - 40px)); height: 100%; margin: 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--space-5); }
 .brand { font: 500 1.6rem var(--font-display); text-decoration: none; }
@@ -78,11 +80,9 @@ h1 { font: 500 clamp(3rem, 8vw, 5rem)/.95 var(--font-display); letter-spacing: -
 .stage-label { position: absolute; top: 18px; color: var(--color-text-subtle); font-size: .62rem; letter-spacing: .12em; text-transform: uppercase; writing-mode: vertical-rl; }
 .stage-label-left { left: -26px; transform: rotate(180deg); }
 .stage-label-right { right: -26px; }
-.hero-stage .specimen { box-shadow: var(--shadow-soft), var(--shadow-glow); }
 .hero-stage .specimen { box-shadow: none; }
 .hero-stage .caption { max-width: 680px; margin: 0 auto; padding: var(--space-5) 0; border-top: 1px solid var(--color-line); background: transparent; }
 .hero-stage .viewer-toolbar { background: transparent; }
-.hero-stage .viewer-modes { background: rgba(16, 20, 17, .7); }
 .scroll-cue { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-subtle); font-size: .65rem; letter-spacing: .12em; text-decoration: none; text-transform: uppercase; }
 .scroll-cue span { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--color-line-strong); border-radius: 50%; color: var(--color-accent-yellow); font-size: 1rem; }
 .archive-anchor { min-height: 180px; display: grid; place-items: center; color: var(--color-text-subtle); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; }
@@ -92,9 +92,7 @@ h1 { font: 500 clamp(3rem, 8vw, 5rem)/.95 var(--font-display); letter-spacing: -
 .viewer::after { content: ""; position: absolute; z-index: 0; left: 50%; top: 67%; width: min(54%, 230px); height: 14px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(0, 0, 0, .42), rgba(0, 0, 0, .12) 44%, transparent 74%); pointer-events: none; }
 .viewer canvas { position: absolute !important; z-index: 1; inset: 0 !important; width: 100% !important; height: 100% !important; display: block; }
 .viewer.is-ready { cursor: grab; }
-.viewer.is-point-cloud { background: radial-gradient(ellipse at 50% 50%, rgba(255, 55, 216, .16), transparent 40%), #090509; }
-.viewer.is-point-cloud::before { background: repeating-linear-gradient(0deg, transparent 0 52px, rgba(193, 181, 126, .1) 53px, transparent 54px), repeating-linear-gradient(90deg, transparent 0 92px, rgba(193, 181, 126, .07) 93px, transparent 94px); opacity: .8; }
-.viewer.is-point-cloud::after { background: radial-gradient(ellipse, rgba(193, 181, 126, .24), rgba(193, 181, 126, .06) 42%, transparent 74%); }
+/* Máscaras de rayos X: el cover tapa el Gaussian y el canvas de puntos queda encima. */
 .point-mask-layer { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .point-mask-cover, .point-mask { position: absolute; width: clamp(92px, 20%, 148px); aspect-ratio: 1; min-height: 0; transform: translate(-50%, -50%); }
 .point-mask-cover { z-index: 4; background: #101511; box-shadow: inset 0 0 22px rgba(193, 181, 126, .1), 0 0 16px rgba(193, 181, 126, .08); pointer-events: none; }
@@ -131,17 +129,20 @@ button:disabled { opacity: .7; cursor: wait; }
 .mode-heading { display: grid; gap: var(--space-1); }
 .mode-heading span { color: var(--color-text); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .mode-heading small { color: var(--color-text-subtle); font-size: .72rem; }
-.viewer-actions { display: flex; gap: var(--space-1); }
-.viewer-actions button { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-color: var(--color-line); background: transparent; color: var(--color-text-subtle); font-size: .72rem; }
-.viewer-actions button:hover:not(:disabled), .viewer-actions button.tool-active { border-color: var(--color-accent-yellow); background: rgba(228, 186, 79, .1); color: var(--color-accent-yellow); }
-.viewer-actions button span { font-size: 1rem; line-height: 1; }
-.viewer-modes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); padding: var(--space-1); border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-bg); }
-.viewer-modes button { display: flex; align-items: center; gap: var(--space-2); min-width: 142px; padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: calc(var(--radius-md) - 2px); background: transparent; color: var(--color-text-subtle); font-size: .72rem; text-align: left; }
-.viewer-modes button:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-raised); border-color: transparent; }
-.viewer-modes button.selected { border-color: var(--color-accent-green); background: rgba(125, 166, 124, .14); color: var(--color-text); box-shadow: 0 0 0 1px rgba(125, 166, 124, .08); }
-.mode-index { color: var(--color-accent-yellow); font-size: .62rem; letter-spacing: .08em; }
+.dalia-assistant { max-width: 680px; margin: 0 auto; padding: var(--space-8) 0; border-top: 1px solid var(--color-line); }
+.dalia-assistant h2 { margin: var(--space-3) 0 var(--space-5); font: 500 2rem/1.05 var(--font-display); }
+.dalia-assistant form { display: grid; gap: var(--space-3); }
+.dalia-assistant label { color: var(--color-text-muted); font-size: .78rem; }
+.dalia-assistant select { width: 100%; min-height: 46px; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-line-strong); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font: inherit; }
+.dalia-assistant select:focus-visible { outline: 2px solid var(--color-accent-yellow); outline-offset: 3px; }
+.dalia-assistant button { justify-self: start; min-height: 44px; }
+.dalia-answer { margin-top: var(--space-5); padding: var(--space-4); border-left: 2px solid var(--color-accent-yellow); background: var(--color-surface); }
+.dalia-answer small { color: var(--color-accent-green); font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; }
+.dalia-answer p { margin: var(--space-2) 0 0; color: var(--color-text-muted); line-height: 1.6; }
+.dalia-error { margin: var(--space-4) 0 0; color: var(--color-accent-red); line-height: 1.5; }
+/* Pie, ficha botánica y ajustes responsive. */
 footer { border-top: 1px solid var(--color-line); padding: var(--space-5) 0 var(--space-6); color: var(--color-text-subtle); font-size: .8rem; }
-@media (max-width: 700px) { .page { width: min(100% - 28px, 1080px); padding-top: 64px; } .topbar { height: 64px; } .topbar-inner { width: min(100% - 28px, 1080px); grid-template-columns: 1fr auto; } .nav-status { display: none; } .primary-nav { gap: var(--space-4); } .intro { padding: var(--space-7) 0 var(--space-6); } .hero-intro { min-height: auto; grid-template-columns: 1fr; gap: var(--space-6); } .hero-meta { grid-template-columns: repeat(3, 1fr); gap: var(--space-2); min-width: 0; } .hero-meta span { padding-left: var(--space-2); } .hero-meta b { font-size: .62rem; } .hero-meta small { font-size: .5rem; letter-spacing: .06em; } .specimens { gap: var(--space-4); } .hero-stage { padding-bottom: 90px; } .stage-label { display: none; } .viewer { height: 330px; } .viewer-toolbar { align-items: stretch; flex-direction: column; gap: var(--space-3); } .viewer-actions { justify-content: stretch; } .viewer-actions button { flex: 1; justify-content: center; } .viewer-modes { width: 100%; } .viewer-modes button { min-width: 0; } .botanical-grid { grid-template-columns: 1fr; gap: var(--space-3); } .archive-anchor { min-height: 120px; } }
+@media (max-width: 700px) { .page { width: min(100% - 28px, 1080px); padding-top: 64px; } .topbar { height: 64px; } .topbar-inner { width: min(100% - 28px, 1080px); grid-template-columns: 1fr auto; } .nav-status { display: none; } .primary-nav { gap: var(--space-4); } .intro { padding: var(--space-7) 0 var(--space-6); } .hero-intro { min-height: auto; grid-template-columns: 1fr; gap: var(--space-6); } .hero-meta { grid-template-columns: repeat(3, 1fr); gap: var(--space-2); min-width: 0; } .hero-meta span { padding-left: var(--space-2); } .hero-meta b { font-size: .62rem; } .hero-meta small { font-size: .5rem; letter-spacing: .06em; } .specimens { gap: var(--space-4); } .hero-stage { padding-bottom: 90px; } .stage-label { display: none; } .viewer { height: 330px; } .viewer-toolbar { align-items: stretch; flex-direction: column; gap: var(--space-3); } .botanical-grid { grid-template-columns: 1fr; gap: var(--space-3); } .archive-anchor { min-height: 120px; } .dalia-assistant { padding: var(--space-7) 0; } .dalia-assistant h2 { font-size: 1.7rem; } .dalia-assistant button { width: 100%; } }
 
 @media (max-width: 700px) {
   button, .primary-nav a { min-height: 44px; }

@@ -3,35 +3,17 @@ import { createRoot } from 'react-dom/client';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import Lenis from 'lenis';
 import * as THREE from 'three';
+import { specimens } from './data/specimens';
+import {
+  createPointCloudMaterial,
+  POINT_CLOUD_CAMERA_FOV,
+  POINT_CLOUD_CAMERA_SCALE,
+  POINT_CLOUD_RENDER_FPS,
+} from './shaders/pointCloud';
 import './style.css';
 
-const specimens = [
-  {
-    number: '01',
-    id: 'amarilla',
-    name: 'Dalia amarilla',
-    scientific: 'Dahlia spp.',
-    note: 'Flor amarilla',
-    file: 'scan-01.ksplat',
-    pointsFile: 'scan-01.points.bin',
-    center: [-0.04565, -0.0768, 0.02628],
-    cameraDistance: 0.22,
-    botanical: { family: 'Asteraceae', color: 'Amarillo cálido', scan: '37,438 splats', description: 'Registro tridimensional de una dalia ornamental para observar su volumen, estructura y color.' },
-  },
-  {
-    number: '02',
-    id: 'pompon-roja',
-    name: 'Dalia pompón roja',
-    scientific: 'Dahlia spp.',
-    note: 'Tipo pompón · Flor roja',
-    file: 'scan-02.ksplat',
-    pointsFile: 'scan-02.points.bin',
-    center: [-0.02789, -0.12974, 0.06956],
-    cameraDistance: 0.22,
-    botanical: { family: 'Asteraceae', color: 'Rojo intenso', scan: '25,319 splats', description: 'Registro tridimensional de una dalia tipo pompón, conservando la densidad visual de sus pétalos.' },
-  },
-];
-
+// Capa de rayos X: el Gaussian permanece debajo y cada máscara recorta
+// una nube de puntos a escala completa, sin volver a centrar la flor.
 function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onStopDrag }) {
   const layerRef = useRef(null);
   const masksRef = useRef(masks);
@@ -90,44 +72,14 @@ function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onSto
         geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
-        material = new THREE.ShaderMaterial({
-          uniforms: { uTime: { value: 0 }, uViewportHeight: { value: 1 }, uPointSize: { value: 0.0028 } },
-          vertexColors: true,
-          transparent: true,
-          depthWrite: false,
-          vertexShader: `
-            uniform float uTime;
-            uniform float uViewportHeight;
-            uniform float uPointSize;
-            varying vec3 vColor;
-            void main() {
-              vec3 noise = vec3(
-                sin(uTime * 1.7 + position.y * 42.0 + position.z * 19.0),
-                cos(uTime * 1.35 + position.x * 37.0 + position.z * 13.0),
-                sin(uTime * 1.15 + position.x * 23.0 - position.y * 31.0)
-              ) * 0.0008;
-              vec4 mvPosition = modelViewMatrix * vec4(position + noise, 1.0);
-              gl_Position = projectionMatrix * mvPosition;
-              gl_PointSize = uPointSize * uViewportHeight / (-mvPosition.z * 2.0 * tan(radians(50.0) * 0.5));
-              vColor = color;
-            }
-          `,
-          fragmentShader: `
-            varying vec3 vColor;
-            void main() {
-              float edge = distance(gl_PointCoord, vec2(0.5));
-              if (edge > 0.5) discard;
-              gl_FragColor = vec4(vColor, smoothstep(0.5, 0.18, edge) * 0.92);
-            }
-          `,
-        });
+        material = createPointCloudMaterial();
 
         masks.forEach((mask) => {
           const scene = new THREE.Scene();
           // Match GaussianSplats3D's default perspective exactly so the point
           // cloud occupies the same pixels as the underlying Gaussian.
-          const camera = new THREE.PerspectiveCamera(50, (layerRef.current.clientWidth || 1) / (layerRef.current.clientHeight || 1), 0.01, 100);
-          camera.position.set(0, 0, specimen.cameraDistance * 0.72);
+          const camera = new THREE.PerspectiveCamera(POINT_CLOUD_CAMERA_FOV, (layerRef.current.clientWidth || 1) / (layerRef.current.clientHeight || 1), 0.01, 100);
+          camera.position.set(0, 0, specimen.cameraDistance * POINT_CLOUD_CAMERA_SCALE);
           camera.up.set(0, -1, 0);
           camera.lookAt(0, 0, 0);
           scene.add(new THREE.Points(geometry, material));
@@ -172,7 +124,7 @@ function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onSto
             ];
             const cameraChanged = !lastCameraSnapshot || nextSnapshot.some((value, index) => Math.abs(value - lastCameraSnapshot[index]) > 0.00001);
             const now = performance.now();
-            const animationDue = now - lastRenderTime >= 1000 / 30;
+            const animationDue = now - lastRenderTime >= 1000 / POINT_CLOUD_RENDER_FPS;
             if (cameraChanged || animationDue) {
               material.uniforms.uTime.value = now * 0.001;
               cameras.forEach(({ renderer, camera, scene }) => {
@@ -218,6 +170,8 @@ function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onSto
 }
 
 function SplatViewer({ specimen }) {
+  // Carga el archivo .ksplat y mantiene la cámara principal del Gaussian.
+  // viewerRef se comparte con PointMaskLayer para sincronizar zoom y movimiento.
   const hostRef = useRef(null);
   const viewerRef = useRef(null);
   const [state, setState] = useState('idle');
@@ -287,6 +241,7 @@ function SplatViewer({ specimen }) {
 }
 
 function SpecimenCard({ specimen }) {
+  // Ficha visual de cada especie: visor, nombre y datos botánicos expandibles.
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
@@ -317,7 +272,90 @@ function SpecimenCard({ specimen }) {
   );
 }
 
+function DaliaAssistant() {
+  // Vite redirige esta ruta al Webhook local:
+  // http://localhost:5678/webhook-test/dalia
+  const n8nWebhookUrl = '/api/n8n/webhook-test/dalia';
+  const [pregunta, setPregunta] = useState('nombre_cientifico');
+  const [respuesta, setRespuesta] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const preguntas = [
+    ['nombre_cientifico', '¿Cuál es el nombre científico?'],
+    ['familia_botanica', '¿A qué familia pertenece?'],
+    ['descripcion', '¿Cómo es la Dalia?'],
+    ['color', '¿De qué colores puede ser?'],
+    ['tamano_aprox', '¿Cuánto mide?'],
+    ['epoca_floracion', '¿Cuándo florece?'],
+    ['habitat', '¿Dónde crece?'],
+    ['altitud_aprox', '¿A qué altitud se encuentra?'],
+    ['polinizadores', '¿Qué polinizadores atrae?'],
+    ['estado_conservacion', '¿Cuál es su estado de conservación?'],
+    ['usos_ecologicos', '¿Qué usos ecológicos tiene?'],
+    ['fuentes', '¿Cuáles son sus fuentes?'],
+  ];
+
+  const consultarDalia = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError('');
+    setRespuesta('');
+
+    try {
+      const response = await fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pregunta }),
+      });
+
+      if (!response.ok) throw new Error('No se pudo conectar con n8n');
+
+      const data = await response.json();
+      setRespuesta(data.respuesta || 'n8n no devolvió una respuesta.');
+    } catch (requestError) {
+      console.error(requestError);
+      setError('No fue posible obtener una respuesta. Verifica que n8n esté ejecutándose.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="dalia-assistant" id="asistente" aria-labelledby="assistant-title">
+      <p className="eyebrow">Consulta biocultural</p>
+      <h2 id="assistant-title">Pregunta sobre la Dalia</h2>
+
+      <form onSubmit={consultarDalia}>
+        <label htmlFor="dalia-question">Selecciona una pregunta</label>
+        <select
+          id="dalia-question"
+          value={pregunta}
+          onChange={(event) => setPregunta(event.target.value)}
+        >
+          {preguntas.map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Consultando…' : 'Consultar'}
+        </button>
+      </form>
+
+      {respuesta && (
+        <div className="dalia-answer" aria-live="polite">
+          <small>Respuesta registrada</small>
+          <p>{respuesta}</p>
+        </div>
+      )}
+
+      {error && <p className="dalia-error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
 function App() {
+  // Estado global de la página: especie activa, navegación y scroll suave.
   const [specimenIndex, setSpecimenIndex] = useState(0);
   const specimen = specimens[specimenIndex];
   const [activeSection, setActiveSection] = useState('inicio');
@@ -398,6 +436,7 @@ function App() {
         <SpecimenCard key={specimen.id} specimen={specimen} />
         <motion.a className="scroll-cue" href="#archivo" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 1.2 }}><span>↓</span> Explorar archivo</motion.a>
       </motion.section>
+      <DaliaAssistant />
       <motion.section className="archive-anchor" id="archivo" aria-label="Archivo botánico" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.7 }}><span>Archivo botánico</span></motion.section>
       <footer>Floretum · Archivo visual de dalias</footer>
     </main>
