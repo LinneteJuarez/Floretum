@@ -4,6 +4,7 @@ export const specimens = [
   {
     number: '01',
     id: 'amarilla',
+    dataId: 'FLOR-DALIA-001',
     name: 'Dalia amarilla',
     scientific: 'Dahlia spp.',
     note: 'Flor amarilla',
@@ -21,6 +22,7 @@ export const specimens = [
   {
     number: '02',
     id: 'pompon-roja',
+    dataId: 'FLOR-DALIA-002',
     name: 'Dalia pompón roja',
     scientific: 'Dahlia spp.',
     note: 'Tipo pompón · Flor roja',
