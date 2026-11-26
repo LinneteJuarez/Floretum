@@ -10,6 +10,7 @@ import {
   POINT_CLOUD_CAMERA_SCALE,
   POINT_CLOUD_RENDER_FPS,
 } from './shaders/pointCloud';
+import SpecimenAudio from './audio/SpecimenAudio.jsx';
 import './style.css';
 
 // Capa de rayos X: el Gaussian permanece debajo y cada máscara recorta
@@ -247,6 +248,7 @@ function SpecimenCard({ specimen }) {
   return (
     <motion.article className="specimen" initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.25 }} transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}>
       <SplatViewer specimen={specimen} />
+      <SpecimenAudio specimen={specimen} />
       <motion.div className="caption" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, amount: 0.4 }} transition={{ duration: 0.6, delay: 0.15 }}>
         <div className="caption-copy">
           <h2>{specimen.name}</h2>
