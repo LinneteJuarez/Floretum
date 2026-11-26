@@ -1,11 +1,26 @@
 import { useEffect, useState } from 'react';
 import * as Tone from 'tone';
-import { buildSoundEvents, loadPointCloud, DURATION, PENTATONIC_NOTES } from './sonify.js';
+import { buildSoundEvents, loadPointCloud, DURATION } from './sonify.js';
 import { samplePointCloud } from './samplePointCloud.js';
+import { buildRhythm, loadSampleUrls } from './sampleArrangement.js';
 
 const SAMPLE_INTERVAL = 85;
-const LOCAL_DEGREES = [0, 2, 3, 5];
-const PENTATONIC_DEGREES = PENTATONIC_NOTES.length - 1;
+
+async function loadSamples(signal) {
+  const urls = loadSampleUrls(import.meta.env.BASE_URL);
+  return Promise.all(Object.entries(urls).map(async ([name, path]) => {
+    const url = new URL(path, document.baseURI);
+    try {
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const buffer = await Tone.getContext().decodeAudioData(await response.arrayBuffer());
+      return [name, buffer];
+    } catch (error) {
+      if (signal.aborted) throw error;
+      throw new Error(`No se pudo cargar ${decodeURIComponent(url.pathname.split('/').pop())}.`, { cause: error });
+    }
+  }));
+}
 
 export default function SpecimenAudio({
   specimen, hostRef, viewerRef, ready, enabled, onEnabledChange,
@@ -47,12 +62,18 @@ export default function SpecimenAudio({
 
     async function prepare() {
       try {
-        const points = await loadPointCloud(specimen, controller.signal);
+        const [points, samples] = await Promise.all([
+          loadPointCloud(specimen, controller.signal),
+          loadSamples(controller.signal),
+        ]);
         if (controller.signal.aborted) return;
         const events = buildSoundEvents(points, specimen.center);
-        stopPlayback = playLayers(events, points, specimen, host, viewerRef, () => pointer);
-      } catch {
-        if (!controller.signal.aborted) setError('No se pudo preparar el sonido de la dalia.');
+        stopPlayback = playLayers(samples, events, points, specimen, host, viewerRef, () => pointer);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        controller.abort();
+        console.error('Error de reproducción de la dalia', error);
+        setError(error.message);
       }
     }
 
@@ -75,7 +96,8 @@ export default function SpecimenAudio({
     try {
       await Tone.start();
       onEnabledChange(true);
-    } catch {
+    } catch (error) {
+      console.error('No se pudo activar el audio', error);
       setError('No se pudo activar el audio.');
     }
   }
@@ -100,35 +122,42 @@ export default function SpecimenAudio({
   );
 }
 
-function playLayers(events, points, specimen, host, viewerRef, getPointer) {
+function playLayers(buffers, events, points, specimen, host, viewerRef, getPointer) {
   const output = new Tone.Gain(0).toDestination();
-  const loopPan = new Tone.Panner(0).connect(output);
-  const loopSynth = new Tone.PolySynth(Tone.Synth).connect(loopPan);
-  loopSynth.volume.value = -20;
-
   const localPan = new Tone.Panner(0).connect(output);
   const localGain = new Tone.Gain(0).connect(localPan);
   const filter = new Tone.Filter(800, 'lowpass').connect(localGain);
-  const voice = new Tone.Synth({
-    oscillator: { type: 'triangle' },
-    envelope: { attack: 0.08, sustain: 0.7, release: 0.18 },
-  }).connect(filter);
+  const rhythm = buildRhythm(events, DURATION);
+  let chord = rhythm[0].chord;
+  let lastGuitar = -Infinity;
+  let previousSample = null;
+  const samples = new Map(buffers.map(([name, buffer]) => {
+    const guitar = name.startsWith('acoustic-') || name.startsWith('electric-');
+    const player = new Tone.Player({ url: buffer, fadeOut: 0.08 }).connect(guitar ? filter : output);
+    return [name, player];
+  }));
 
-  let currentMidi = events[0].midi;
-  let sounding = false;
+  function playSample(name, time, volume) {
+    const player = samples.get(name);
+    player.volume.setValueAtTime(volume, time);
+    player.start(time);
+  }
+
   const transport = Tone.getTransport();
-  const part = new Tone.Part((time, event) => {
-    currentMidi = event.midi;
-    loopPan.pan.linearRampToValueAtTime(event.pan, time);
-    loopSynth.triggerAttackRelease(Tone.Frequency(event.midi, 'midi').toFrequency(), event.duration, time, event.velocity);
-  }, events);
+  const part = new Tone.Part((time, step) => {
+    chord = step.chord;
+    const drumLevel = step.drum === 'hat' ? -30 : -23;
+    playSample(step.drum, time, drumLevel + step.accent * 7);
+    if (step.bass) playSample(`bass-${chord}`, time, -21 + step.accent * 4);
+  }, rhythm);
   part.loopEnd = DURATION;
   part.loop = true;
   part.start(transport.seconds + 0.1);
   if (transport.state !== 'started') transport.start();
   output.gain.rampTo(1, 0.12);
+  const timer = window.setInterval(updateHover, SAMPLE_INTERVAL);
 
-  const timer = window.setInterval(() => {
+  function updateHover() {
     const pointer = getPointer();
     const camera = viewerRef.current?.camera;
     const region = pointer && camera && !document.hidden
@@ -136,44 +165,38 @@ function playLayers(events, points, specimen, host, viewerRef, getPointer) {
       : null;
 
     if (!region) {
-      if (sounding) {
-        voice.triggerRelease();
-        localGain.gain.rampTo(0, 0.12);
-        sounding = false;
-      }
+      if (previousSample) localGain.gain.rampTo(0, 0.12);
+      previousSample = null;
       return;
     }
 
     const brightness = 0.21 * region.red + 0.72 * region.green + 0.07 * region.blue;
     const greenDominance = Math.max(0, region.green - Math.max(region.red, region.blue));
     const proximity = Math.min(1, specimen.cameraDistance / Math.max(region.depth, 0.001));
-    const degreeOffset = LOCAL_DEGREES[Math.min(3, Math.floor(region.spread * 4))];
-    const degree = PENTATONIC_NOTES.indexOf(currentMidi) + degreeOffset;
-    const midi = PENTATONIC_NOTES[degree % PENTATONIC_DEGREES] + 12 * Math.floor(degree / PENTATONIC_DEGREES);
-    const frequency = Tone.Frequency(midi, 'midi').toFrequency();
-    filter.frequency.rampTo(300 + 2300 * brightness * (1 - greenDominance), 0.1);
+    const guitar = brightness > 0.38 && greenDominance < 0.04 ? 'acoustic' : 'electric';
+    const sample = `${guitar}-${chord}`;
+    const now = Tone.now();
+    filter.frequency.rampTo(450 + 3200 * brightness, 0.1);
     localPan.pan.rampTo(region.pan * 0.7, 0.1);
-    localGain.gain.rampTo(Math.min(0.2, Math.sqrt(region.count) * 0.025) * proximity, 0.1);
+    localGain.gain.rampTo(Math.min(0.55, 0.12 + Math.sqrt(region.count) * 0.055) * proximity, 0.1);
 
-    if (sounding) {
-      voice.frequency.rampTo(frequency, 0.12);
-    } else {
-      voice.triggerAttack(frequency);
-      sounding = true;
+    const retriggerAfter = 0.75 - 0.25 * region.spread;
+    if (!previousSample || now - lastGuitar >= (sample === previousSample ? retriggerAfter : 0.3)) {
+      playSample(sample, now, -14);
+      previousSample = sample;
+      lastGuitar = now;
     }
-  }, SAMPLE_INTERVAL);
+  }
 
   return () => {
     window.clearInterval(timer);
     part.dispose();
     output.gain.rampTo(0, 0.06);
     window.setTimeout(() => {
-      voice.dispose();
+      samples.forEach((player) => player.dispose());
       filter.dispose();
       localGain.dispose();
       localPan.dispose();
-      loopSynth.dispose();
-      loopPan.dispose();
       output.dispose();
     }, 160);
   };

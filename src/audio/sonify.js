@@ -1,5 +1,5 @@
 const POINT_BYTES = 16;
-const SECTOR_COUNT = 48;
+const SECTOR_COUNT = 72;
 export const DURATION = 16;
 export const PENTATONIC_NOTES = [60, 62, 64, 67, 69, 72];
 
@@ -32,7 +32,7 @@ export function buildSoundEvents(points, center) {
     const pointCount = points.byteLength / POINT_BYTES;
     const secondsPerSector = DURATION / SECTOR_COUNT;
     const sectors = Array.from({ length: SECTOR_COUNT }, () => []);
-    let maxRadius = 0;
+    let maxRadius = 0.5;
   
     for (let offset = 0; offset < points.byteLength; offset += POINT_BYTES) {
       const x = points.getFloat32(offset, true) - centerX;
@@ -54,8 +54,8 @@ export function buildSoundEvents(points, center) {
       const noteIndex = Math.round(normalizedRadius * (PENTATONIC_NOTES.length - 1));
   
       const fraction = radii.length / pointCount;
-      const velocity = 0.05 + 0.35 * Math.min(1, Math.sqrt(fraction / 0.06));
-      const angle = ((index + 0.15) / SECTOR_COUNT) * fullTurn;
+      const velocity = 0.15 + 0.75 * Math.min(1, Math.sqrt(fraction / 0.05));
+      const angle = ((index + 0.45) / SECTOR_COUNT) * fullTurn;
   
       return [{
         time: index * secondsPerSector,
