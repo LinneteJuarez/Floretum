@@ -15,7 +15,7 @@ const specimens = [
     file: 'scan-01.ksplat',
     pointsFile: 'scan-01.points.bin',
     center: [-0.04565, -0.0768, 0.02628],
-    cameraDistance: 0.37,
+    cameraDistance: 0.22,
     botanical: { family: 'Asteraceae', color: 'Amarillo cálido', scan: '37,438 splats', description: 'Registro tridimensional de una dalia ornamental para observar su volumen, estructura y color.' },
   },
   {
@@ -27,218 +27,263 @@ const specimens = [
     file: 'scan-02.ksplat',
     pointsFile: 'scan-02.points.bin',
     center: [-0.02789, -0.12974, 0.06956],
-    cameraDistance: 0.37,
+    cameraDistance: 0.22,
     botanical: { family: 'Asteraceae', color: 'Rojo intenso', scan: '25,319 splats', description: 'Registro tridimensional de una dalia tipo pompón, conservando la densidad visual de sus pétalos.' },
   },
 ];
 
-function SplatViewer({ specimen }) {
-  const hostRef = useRef(null);
-  const viewerRef = useRef(null);
-  const rendererRef = useRef(null);
-  const controlsRef = useRef(null);
-  const autoRotateRef = useRef(false);
-  const [state, setState] = useState('idle');
-  const [mode, setMode] = useState('splat');
-  const [autoRotate, setAutoRotate] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [loadStatus, setLoadStatus] = useState('Preparando visor');
-  const [retryKey, setRetryKey] = useState(0);
+function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onStopDrag }) {
+  const layerRef = useRef(null);
+  const masksRef = useRef(masks);
+  masksRef.current = masks;
+
+  const alignCanvases = () => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    const fullWidth = layer.clientWidth;
+    const fullHeight = layer.clientHeight;
+    masksRef.current.forEach((mask) => {
+      const maskElement = layer.querySelector(`[data-mask="${mask.id}"]`);
+      const canvas = layer.querySelector(`[data-point-canvas="${mask.id}"]`);
+      if (!maskElement || !canvas) return;
+      const maskWidth = maskElement.clientWidth || 120;
+      const maskHeight = maskElement.clientHeight || 120;
+      const left = mask.x / 100 * fullWidth - maskWidth / 2;
+      const top = mask.y / 100 * fullHeight - maskHeight / 2;
+      canvas.style.clipPath = `inset(${top}px ${Math.max(0, fullWidth - left - maskWidth)}px ${Math.max(0, fullHeight - top - maskHeight)}px ${Math.max(0, left)}px)`;
+    });
+  };
+
+  useEffect(() => { window.requestAnimationFrame(alignCanvases); }, [masks]);
 
   useEffect(() => {
     let cancelled = false;
     let frameId = null;
-    let pointGeometry = null;
-    let pointMaterial = null;
-    let pointControls = null;
+    let geometry = null;
+    let material = null;
     let resizeObserver = null;
+    const renderers = [];
+    const cameras = [];
+    const specimenCenter = new THREE.Vector3(...specimen.center);
+    let lastCameraSnapshot = null;
+    let lastRenderTime = -Infinity;
 
-    async function load() {
-      setState('loading');
-      setProgress(0);
-      setLoadStatus(mode === 'splat' ? 'Descargando Gaussian' : 'Descargando nube de puntos');
-      viewerRef.current?.dispose?.();
-      viewerRef.current = null;
-      rendererRef.current?.dispose?.();
-      rendererRef.current = null;
-      controlsRef.current = null;
-      // React owns the overlay labels/buttons inside this element; only clear
-      // renderer canvases so a state update cannot make the whole page blank.
-      hostRef.current?.querySelectorAll('canvas').forEach((canvas) => canvas.remove());
-
+    async function loadPointCloud() {
       try {
-        if (mode === 'splat') {
-          const GaussianSplats3D = await import('@mkkellogg/gaussian-splats-3d');
-          if (cancelled) return;
-          const viewer = new GaussianSplats3D.Viewer({
-            rootElement: hostRef.current,
-            sharedMemoryForWorkers: false,
-            gpuAcceleratedSort: false,
-            enableSIMDInSort: true,
-            useBuiltInControls: true,
-            sphericalHarmonicsDegree: 0,
-            inMemoryCompressionLevel: 2,
-            freeIntermediateSplatData: true,
-            initialCameraPosition: [
-              specimen.center[0],
-              specimen.center[1],
-              specimen.center[2] + specimen.cameraDistance,
-            ],
-            initialCameraLookAt: specimen.center,
-            cameraUp: [0, -1, 0],
-          });
-          viewerRef.current = viewer;
-          await viewer.addSplatScene(`${import.meta.env.BASE_URL}scans/${specimen.file}`, {
-            showLoadingUI: false,
-            progressiveLoad: true,
-            optimizeSplatData: true,
-            onProgress: (percentComplete) => {
-              if (cancelled) return;
-              setProgress(Math.round(percentComplete));
-              setLoadStatus(percentComplete >= 100 ? 'Procesando estructura' : 'Descargando Gaussian');
-            },
-          });
-          if (cancelled) return;
-          viewer.start();
-          controlsRef.current = viewer.controls;
-          if (controlsRef.current) controlsRef.current.autoRotate = autoRotateRef.current;
-        } else {
-          const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
-          const response = await fetch(`${import.meta.env.BASE_URL}scans/${specimen.pointsFile}`);
-          if (!response.ok) throw new Error(`No se pudo abrir ${specimen.pointsFile}`);
-          const bytes = await response.arrayBuffer();
-          if (cancelled) return;
-          setProgress(100);
-          setLoadStatus('Preparando nube de puntos');
+        const response = await fetch(`${import.meta.env.BASE_URL}scans/${specimen.pointsFile}`);
+        if (!response.ok) throw new Error(`No se pudo abrir ${specimen.pointsFile}`);
+        const bytes = await response.arrayBuffer();
+        if (cancelled || !layerRef.current) return;
+        const count = bytes.byteLength / 16;
+        const data = new DataView(bytes);
+        const positions = new Float32Array(count * 3);
+        const colors = new Uint8Array(count * 3);
+        for (let index = 0; index < count; index += 1) {
+          const source = index * 16;
+          positions[index * 3] = data.getFloat32(source, true) - specimen.center[0];
+          positions[index * 3 + 1] = data.getFloat32(source + 4, true) - specimen.center[1];
+          positions[index * 3 + 2] = data.getFloat32(source + 8, true) - specimen.center[2];
+          colors[index * 3] = data.getUint8(source + 12);
+          colors[index * 3 + 1] = data.getUint8(source + 13);
+          colors[index * 3 + 2] = data.getUint8(source + 14);
+        }
+        geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
+        material = new THREE.ShaderMaterial({
+          uniforms: { uTime: { value: 0 }, uViewportHeight: { value: 1 }, uPointSize: { value: 0.0028 } },
+          vertexColors: true,
+          transparent: true,
+          depthWrite: false,
+          vertexShader: `
+            uniform float uTime;
+            uniform float uViewportHeight;
+            uniform float uPointSize;
+            varying vec3 vColor;
+            void main() {
+              vec3 noise = vec3(
+                sin(uTime * 1.7 + position.y * 42.0 + position.z * 19.0),
+                cos(uTime * 1.35 + position.x * 37.0 + position.z * 13.0),
+                sin(uTime * 1.15 + position.x * 23.0 - position.y * 31.0)
+              ) * 0.0008;
+              vec4 mvPosition = modelViewMatrix * vec4(position + noise, 1.0);
+              gl_Position = projectionMatrix * mvPosition;
+              gl_PointSize = uPointSize * uViewportHeight / (-mvPosition.z * 2.0 * tan(radians(50.0) * 0.5));
+              vColor = color;
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vColor;
+            void main() {
+              float edge = distance(gl_PointCoord, vec2(0.5));
+              if (edge > 0.5) discard;
+              gl_FragColor = vec4(vColor, smoothstep(0.5, 0.18, edge) * 0.92);
+            }
+          `,
+        });
 
-          const count = bytes.byteLength / 16;
-          const data = new DataView(bytes);
-          const positions = new Float32Array(count * 3);
-          const colors = new Uint8Array(count * 3);
-          for (let index = 0; index < count; index += 1) {
-            const source = index * 16;
-            positions[index * 3] = data.getFloat32(source, true);
-            positions[index * 3 + 1] = data.getFloat32(source + 4, true);
-            positions[index * 3 + 2] = data.getFloat32(source + 8, true);
-            colors[index * 3] = data.getUint8(source + 12);
-            colors[index * 3 + 1] = data.getUint8(source + 13);
-            colors[index * 3 + 2] = data.getUint8(source + 14);
-          }
-
+        masks.forEach((mask) => {
           const scene = new THREE.Scene();
-          const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
-          camera.position.set(specimen.center[0], specimen.center[1], specimen.center[2] + specimen.cameraDistance);
-          camera.lookAt(...specimen.center);
+          // Match GaussianSplats3D's default perspective exactly so the point
+          // cloud occupies the same pixels as the underlying Gaussian.
+          const camera = new THREE.PerspectiveCamera(50, (layerRef.current.clientWidth || 1) / (layerRef.current.clientHeight || 1), 0.01, 100);
+          camera.position.set(0, 0, specimen.cameraDistance * 0.72);
+          camera.up.set(0, -1, 0);
+          camera.lookAt(0, 0, 0);
+          scene.add(new THREE.Points(geometry, material));
           const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
           renderer.setClearColor(0x000000, 0);
-          hostRef.current.appendChild(renderer.domElement);
-          rendererRef.current = renderer;
+          renderer.domElement.dataset.pointCanvas = mask.id;
+          renderer.domElement.style.position = 'absolute';
+          renderer.domElement.style.left = '0px';
+          renderer.domElement.style.top = '0px';
+          renderer.domElement.style.zIndex = '5';
+          renderer.domElement.style.pointerEvents = 'none';
+          layerRef.current.appendChild(renderer.domElement);
+          renderers.push(renderer);
+          cameras.push({ renderer, camera, scene });
+        });
 
-          const geometry = new THREE.BufferGeometry();
-          geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-          geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
-          pointGeometry = geometry;
-          pointMaterial = new THREE.PointsMaterial({ size: 0.004, vertexColors: true, sizeAttenuation: true });
-          const points = new THREE.Points(pointGeometry, pointMaterial);
-          scene.add(points);
-
-          const controls = new OrbitControls(camera, renderer.domElement);
-          pointControls = controls;
-          controls.target.set(...specimen.center);
-          controls.enableDamping = true;
-          controls.autoRotate = autoRotateRef.current;
-          controlsRef.current = controls;
-
-          const resize = () => {
-            if (!hostRef.current) return;
-            const { clientWidth, clientHeight } = hostRef.current;
-            camera.aspect = clientWidth / clientHeight;
+        const resize = () => {
+          const width = layerRef.current?.clientWidth || 120;
+          const height = layerRef.current?.clientHeight || 120;
+          cameras.forEach(({ renderer, camera }) => {
+            camera.aspect = width / height;
             camera.updateProjectionMatrix();
-            renderer.setSize(clientWidth, clientHeight, false);
-          };
-          resizeObserver = new ResizeObserver(resize);
-          resizeObserver.observe(hostRef.current);
-          resize();
-          const animate = () => {
-            if (cancelled) return;
-            controls.update();
-            renderer.render(scene, camera);
-            frameId = requestAnimationFrame(animate);
-          };
-          animate();
-        }
-        if (!cancelled) {
-          setProgress(100);
-          setLoadStatus('Visor listo');
-          setState('ready');
-        }
+            renderer.setSize(width, height, false);
+            renderer.domElement.style.width = `${width}px`;
+            renderer.domElement.style.height = `${height}px`;
+          });
+          material.uniforms.uViewportHeight.value = height * Math.min(window.devicePixelRatio, 1.5);
+          alignCanvases();
+        };
+        resizeObserver = new ResizeObserver(resize);
+        resizeObserver.observe(layerRef.current);
+        resize();
+        const animate = () => {
+          if (cancelled) return;
+          const sourceCamera = viewerRef.current?.camera;
+          if (sourceCamera) {
+            const nextSnapshot = [
+              sourceCamera.position.x, sourceCamera.position.y, sourceCamera.position.z,
+              sourceCamera.quaternion.x, sourceCamera.quaternion.y, sourceCamera.quaternion.z, sourceCamera.quaternion.w,
+              sourceCamera.fov, sourceCamera.zoom,
+            ];
+            const cameraChanged = !lastCameraSnapshot || nextSnapshot.some((value, index) => Math.abs(value - lastCameraSnapshot[index]) > 0.00001);
+            const now = performance.now();
+            const animationDue = now - lastRenderTime >= 1000 / 30;
+            if (cameraChanged || animationDue) {
+              material.uniforms.uTime.value = now * 0.001;
+              cameras.forEach(({ renderer, camera, scene }) => {
+                camera.position.copy(sourceCamera.position).sub(specimenCenter);
+                camera.quaternion.copy(sourceCamera.quaternion);
+                camera.fov = sourceCamera.fov || camera.fov;
+                camera.zoom = sourceCamera.zoom || 1;
+                camera.near = sourceCamera.near;
+                camera.far = sourceCamera.far;
+                camera.updateProjectionMatrix();
+                renderer.render(scene, camera);
+              });
+              lastCameraSnapshot = nextSnapshot;
+              lastRenderTime = now;
+            }
+          } else {
+            cameras.forEach(({ renderer, camera, scene }) => renderer.render(scene, camera));
+          }
+          frameId = requestAnimationFrame(animate);
+        };
+        animate();
       } catch (error) {
-        if (cancelled) return;
-        console.error(`No se pudo cargar ${specimen.name}`, error);
-        viewerRef.current?.dispose?.();
-        rendererRef.current?.dispose?.();
-        viewerRef.current = null;
-        rendererRef.current = null;
-        controlsRef.current = null;
-        pointControls?.dispose?.();
-        pointGeometry?.dispose?.();
-        pointMaterial?.dispose?.();
-        setLoadStatus('No se pudo cargar el archivo');
-        setState('error');
+        console.error('No se pudo preparar la nube de puntos en las máscaras', error);
       }
     }
-
-    load();
+    loadPointCloud();
     return () => {
       cancelled = true;
       if (frameId) cancelAnimationFrame(frameId);
       resizeObserver?.disconnect();
-      pointControls?.dispose?.();
-      pointGeometry?.dispose?.();
-      pointMaterial?.dispose?.();
-      viewerRef.current?.dispose?.();
-      rendererRef.current?.dispose?.();
-      viewerRef.current = null;
-      rendererRef.current = null;
-      controlsRef.current = null;
+      renderers.forEach((renderer) => { renderer.dispose(); renderer.domElement.remove(); });
+      geometry?.dispose();
+      material?.dispose();
     };
-  }, [mode, specimen, retryKey]);
+  }, [specimen]);
 
-  const toggleAutoRotate = () => {
-    const nextValue = !autoRotateRef.current;
-    autoRotateRef.current = nextValue;
-    if (controlsRef.current) controlsRef.current.autoRotate = nextValue;
-    setAutoRotate(nextValue);
+  return <div className="point-mask-layer" ref={layerRef} aria-label="Máscaras móviles de análisis">
+    {masks.map((mask) => <div key={`${mask.id}-cover`} className="point-mask-cover" style={{ left: `${mask.x}%`, top: `${mask.y}%` }} aria-hidden="true" />)}
+    {masks.map((mask) => <div key={mask.id} className="point-mask" data-mask={mask.id} style={{ left: `${mask.x}%`, top: `${mask.y}%` }} role="button" tabIndex="0" aria-label={`Máscara ${mask.id}. Arrastra para moverla`} onPointerDown={(event) => onStartDrag(event, mask)} onPointerMove={(event) => onMove(event, mask.id)} onPointerUp={onStopDrag} onPointerCancel={onStopDrag}>
+      <span>{mask.id}</span>
+    </div>)}
+  </div>;
+}
+
+function SplatViewer({ specimen }) {
+  const hostRef = useRef(null);
+  const viewerRef = useRef(null);
+  const [state, setState] = useState('idle');
+  const [progress, setProgress] = useState(0);
+  const [loadStatus, setLoadStatus] = useState('Preparando visor');
+  const [retryKey, setRetryKey] = useState(0);
+  const [masks, setMasks] = useState([{ id: 'M1', x: 24, y: 58 }, { id: 'M2', x: 66, y: 46 }]);
+  const dragRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setState('loading');
+      setProgress(0);
+      setLoadStatus('Descargando Gaussian');
+      viewerRef.current?.dispose?.();
+      viewerRef.current = null;
+      hostRef.current?.querySelectorAll('canvas').forEach((canvas) => canvas.remove());
+      try {
+        const GaussianSplats3D = await import('@mkkellogg/gaussian-splats-3d');
+        if (cancelled) return;
+        const viewer = new GaussianSplats3D.Viewer({ rootElement: hostRef.current, sharedMemoryForWorkers: false, gpuAcceleratedSort: false, enableSIMDInSort: true, useBuiltInControls: true, sphericalHarmonicsDegree: 0, inMemoryCompressionLevel: 2, freeIntermediateSplatData: true, initialCameraPosition: [specimen.center[0], specimen.center[1], specimen.center[2] + specimen.cameraDistance], initialCameraLookAt: specimen.center, cameraUp: [0, -1, 0] });
+        viewerRef.current = viewer;
+        await viewer.addSplatScene(`${import.meta.env.BASE_URL}scans/${specimen.file}`, { showLoadingUI: false, progressiveLoad: true, optimizeSplatData: true, onProgress: (percentComplete) => { if (!cancelled) { setProgress(Math.round(percentComplete)); setLoadStatus(percentComplete >= 100 ? 'Procesando estructura' : 'Descargando Gaussian'); } } });
+        if (cancelled) return;
+        viewer.start();
+        setProgress(100);
+        setLoadStatus('Visor listo');
+        setState('ready');
+      } catch (error) {
+        if (cancelled) return;
+        console.error(`No se pudo cargar ${specimen.name}`, error);
+        viewerRef.current?.dispose?.();
+        viewerRef.current = null;
+        setLoadStatus('No se pudo cargar el archivo');
+        setState('error');
+      }
+    }
+    load();
+    return () => { cancelled = true; viewerRef.current?.dispose?.(); viewerRef.current = null; };
+  }, [specimen, retryKey]);
+
+  const moveMask = (event, maskId) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== maskId || !hostRef.current) return;
+    const bounds = hostRef.current.getBoundingClientRect();
+    const x = Math.max(2, Math.min(76, ((event.clientX - bounds.left) / bounds.width) * 100 - drag.offsetX));
+    const y = Math.max(2, Math.min(76, ((event.clientY - bounds.top) / bounds.height) * 100 - drag.offsetY));
+    setMasks((current) => current.map((mask) => mask.id === maskId ? { ...mask, x, y } : mask));
   };
-
-  const resetView = () => {
-    controlsRef.current?.reset?.();
+  const startMaskDrag = (event, mask) => {
+    if (!hostRef.current) return;
+    const bounds = hostRef.current.getBoundingClientRect();
+    dragRef.current = { id: mask.id, offsetX: ((event.clientX - bounds.left) / bounds.width) * 100 - mask.x, offsetY: ((event.clientY - bounds.top) / bounds.height) * 100 - mask.y };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
   };
+  const stopMaskDrag = (event) => { dragRef.current = null; event.currentTarget.releasePointerCapture?.(event.pointerId); };
 
-  return (
-    <>
-      <div className={`viewer ${state === 'ready' ? 'is-ready' : ''}`} ref={hostRef} role="img" aria-label={`${mode === 'splat' ? 'Gaussian Splat' : 'Nube de puntos'} de ${specimen.name}`}>
-        <span className="viewer-index">{specimen.number} / DALIA</span>
-        {state !== 'ready' && <div className={`viewer-prompt ${state === 'error' ? 'is-error' : ''}`} role={state === 'error' ? 'alert' : 'status'} aria-live="polite">
-          <strong>{state === 'loading' ? loadStatus : 'No se pudo abrir el archivo'}</strong>
-          {state === 'loading' && <><span>{progress}% · {mode === 'splat' ? 'La flor está tomando forma' : 'Preparando posiciones y color'}</span><span className="load-track" role="progressbar" aria-label="Progreso de carga" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress}><span style={{ width: `${Math.max(progress, 4)}%` }} /></span></>}
-          {state === 'error' && <><span>Comprueba la conexión o intenta cargar el espécimen de nuevo.</span><button type="button" onClick={() => setRetryKey((key) => key + 1)}>Reintentar carga</button></>}
-        </div>}
-      </div>
-      <div className="viewer-toolbar">
-        <div className="mode-heading"><span>Modo de lectura</span><small>{mode === 'splat' ? 'Volumen · profundidad y luz' : 'Materia · posición y color'}</small></div>
-        <div className="viewer-actions" aria-label="Controles de cámara">
-          <button type="button" className={autoRotate ? 'tool-active' : ''} aria-pressed={autoRotate} onClick={toggleAutoRotate}><span aria-hidden="true">↻</span> Rotar</button>
-          <button type="button" onClick={resetView}><span aria-hidden="true">⌂</span> Reiniciar</button>
-        </div>
-        <div className="viewer-modes" role="tablist" aria-label="Modo de visualización">
-          <button type="button" role="tab" aria-selected={mode === 'splat'} className={mode === 'splat' ? 'selected' : ''} onClick={() => setMode('splat')}><span className="mode-index">01</span><span>Gaussian Splat</span></button>
-          <button type="button" role="tab" aria-selected={mode === 'points'} className={mode === 'points' ? 'selected' : ''} onClick={() => setMode('points')}><span className="mode-index">02</span><span>Nube de puntos</span></button>
-        </div>
-      </div>
-    </>
-  );
+  return <>
+    <div className={`viewer ${state === 'ready' ? 'is-ready' : ''}`} ref={hostRef} role="region" aria-label={`Gaussian Splat de ${specimen.name}`}>
+      <span className="viewer-index">{specimen.number} / DALIA</span>
+      {state === 'ready' && <PointMaskLayer specimen={specimen} masks={masks} viewerRef={viewerRef} onStartDrag={startMaskDrag} onMove={moveMask} onStopDrag={stopMaskDrag} />}
+      {state !== 'ready' && <div className={`viewer-prompt ${state === 'error' ? 'is-error' : ''}`} role={state === 'error' ? 'alert' : 'status'} aria-live="polite"><strong>{state === 'loading' ? loadStatus : 'No se pudo abrir el archivo'}</strong>{state === 'loading' && <><span>{progress}% · La flor está tomando forma</span><span className="load-track" role="progressbar" aria-label="Progreso de carga" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress}><span style={{ width: `${Math.max(progress, 4)}%` }} /></span></>}{state === 'error' && <><span>Comprueba la conexión o intenta cargar el espécimen de nuevo.</span><button type="button" onClick={() => setRetryKey((key) => key + 1)}>Reintentar carga</button></>}</div>}
+    </div>
+    <div className="viewer-toolbar"><div className="mode-heading"><span>Gaussian · análisis de puntos</span><small>Mueve M1 y M2 para revelar la estructura</small></div></div>
+  </>;
 }
 
 function SpecimenCard({ specimen }) {
