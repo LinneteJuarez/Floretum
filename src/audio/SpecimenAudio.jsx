@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as Tone from 'tone';
-import { buildSoundEvents, loadPointCloud, DURATION } from './sonify.js';
+import { buildSoundEvents, colorBrightness, loadPointCloud, DURATION } from './sonify.js';
 import { samplePointCloud } from './samplePointCloud.js';
 import { buildRhythm, loadSampleUrls } from './sampleArrangement.js';
 
@@ -124,6 +124,7 @@ export default function SpecimenAudio({
 
 function playLayers(buffers, events, points, specimen, host, viewerRef, getPointer) {
   const output = new Tone.Gain(0).toDestination();
+  const bassFilter = new Tone.Filter(700, 'lowpass').connect(output);
   const localPan = new Tone.Panner(0).connect(output);
   const localGain = new Tone.Gain(0).connect(localPan);
   const filter = new Tone.Filter(800, 'lowpass').connect(localGain);
@@ -131,9 +132,12 @@ function playLayers(buffers, events, points, specimen, host, viewerRef, getPoint
   let chord = rhythm[0].chord;
   let lastGuitar = -Infinity;
   let previousSample = null;
+  let previousPointer = null;
+  let pointerSpeed = 0;
   const samples = new Map(buffers.map(([name, buffer]) => {
     const guitar = name.startsWith('acoustic-') || name.startsWith('electric-');
-    const player = new Tone.Player({ url: buffer, fadeOut: 0.08 }).connect(guitar ? filter : output);
+    const destination = guitar ? filter : name.startsWith('bass-') ? bassFilter : output;
+    const player = new Tone.Player({ url: buffer, fadeOut: 0.08 }).connect(destination);
     return [name, player];
   }));
 
@@ -146,7 +150,8 @@ function playLayers(buffers, events, points, specimen, host, viewerRef, getPoint
   const transport = Tone.getTransport();
   const part = new Tone.Part((time, step) => {
     chord = step.chord;
-    const drumLevel = step.drum === 'hat' ? -30 : -23;
+    const drumLevel = step.drum === 'hat' ? -35 + step.brightness * 18 : -23;
+    bassFilter.frequency.linearRampToValueAtTime(180 * 12 ** step.brightness, time);
     playSample(step.drum, time, drumLevel + step.accent * 7);
     if (step.bass) playSample(`bass-${chord}`, time, -21 + step.accent * 4);
   }, rhythm);
@@ -167,21 +172,30 @@ function playLayers(buffers, events, points, specimen, host, viewerRef, getPoint
     if (!region) {
       if (previousSample) localGain.gain.rampTo(0, 0.12);
       previousSample = null;
+      previousPointer = null;
+      pointerSpeed = 0;
       return;
     }
 
-    const brightness = 0.21 * region.red + 0.72 * region.green + 0.07 * region.blue;
+    const brightness = colorBrightness(region.red, region.green, region.blue);
     const greenDominance = Math.max(0, region.green - Math.max(region.red, region.blue));
     const proximity = Math.min(1, specimen.cameraDistance / Math.max(region.depth, 0.001));
     const guitar = brightness > 0.38 && greenDominance < 0.04 ? 'acoustic' : 'electric';
     const sample = `${guitar}-${chord}`;
     const now = Tone.now();
+    if (previousPointer) {
+      const distance = Math.hypot(pointer.x - previousPointer.x, pointer.y - previousPointer.y);
+      const speed = distance / Math.max(now - previousPointer.time, 0.001);
+      pointerSpeed = 0.45 * pointerSpeed + 0.55 * speed;
+    }
+    previousPointer = { ...pointer, time: now };
     filter.frequency.rampTo(450 + 3200 * brightness, 0.1);
     localPan.pan.rampTo(region.pan * 0.7, 0.1);
     localGain.gain.rampTo(Math.min(0.55, 0.12 + Math.sqrt(region.count) * 0.055) * proximity, 0.1);
 
-    const retriggerAfter = 0.75 - 0.25 * region.spread;
-    if (!previousSample || now - lastGuitar >= (sample === previousSample ? retriggerAfter : 0.3)) {
+    const motion = Math.min(1, pointerSpeed / 650);
+    const retriggerAfter = 0.95 - 0.71 * motion - 0.04 * region.spread;
+    if (now - lastGuitar >= (previousSample ? retriggerAfter : 0.2)) {
       playSample(sample, now, -14);
       previousSample = sample;
       lastGuitar = now;
@@ -194,6 +208,7 @@ function playLayers(buffers, events, points, specimen, host, viewerRef, getPoint
     output.gain.rampTo(0, 0.06);
     window.setTimeout(() => {
       samples.forEach((player) => player.dispose());
+      bassFilter.dispose();
       filter.dispose();
       localGain.dispose();
       localPan.dispose();

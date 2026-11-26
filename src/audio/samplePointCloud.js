@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 
 const RECORD_BYTES = 16;
-const SAMPLE_RADIUS = 20;
+const SAMPLE_RADIUS = 80;
 
 export function samplePointCloud(points, camera, bounds, pointer) {
   const x = pointer.x - bounds.left;

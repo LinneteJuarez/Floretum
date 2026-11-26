@@ -1,6 +1,6 @@
 const DRUMS = 'Casio WK-110 Drum Sample';
 const STRINGS = 'Instruments Single Strings';
-const CHORDS = ['c', 'f', 'g', 'c'];
+const CHORDS = ['c', 'f', 'e', 'c', 'g'];
 const STEPS_PER_CHORD = 8;
 const SAMPLE_URLS = {
   kick: `${DRUMS}/casio-wk-110-standard-kick.wav`,
@@ -23,21 +23,34 @@ export function loadSampleUrls(baseUrl) {
 
 export function buildRhythm(events, duration) {
   const stepDuration = duration / (CHORDS.length * STEPS_PER_CHORD);
-  const levels = new Map();
+  const summaries = new Map();
+  let flowerPoints = 0;
+  let flowerBrightnessSum = 0;
 
   for (const event of events) {
     const step = Math.floor(event.time / stepDuration);
-    levels.set(step, Math.max(levels.get(step) ?? 0, event.velocity));
+    const summary = summaries.get(step) ?? { accent: 0, points: 0, brightnessSum: 0 };
+    const brightnessSum = event.brightness * event.points;
+    summary.accent = Math.max(summary.accent, event.velocity);
+    summary.points += event.points;
+    summary.brightnessSum += brightnessSum;
+    summaries.set(step, summary);
+    flowerPoints += event.points;
+    flowerBrightnessSum += brightnessSum;
   }
 
+  const flowerBrightness = flowerPoints ? flowerBrightnessSum / flowerPoints : 0;
   return CHORDS.flatMap((chord, bar) => Array.from({ length: STEPS_PER_CHORD }, (_, beat) => {
     const step = bar * STEPS_PER_CHORD + beat;
+    const summary = summaries.get(step);
+    const stepBrightness = summary ? summary.brightnessSum / summary.points : flowerBrightness;
     return {
       time: step * stepDuration,
       chord,
-      drum: beat % 4 === 0 ? 'kick' : beat % 4 === 2 ? 'rim' : 'hat',
-      bass: beat === 0 || beat === 4,
-      accent: levels.get(step) ?? 0,
+      drum: beat % 4 === 0 ? 'kick' : beat % 8 === 2 ? 'rim' : 'hat',
+      bass: beat === 0 || beat === 2,
+      accent: summary?.accent ?? 0,
+      brightness: 0.05 * flowerBrightness + 0.25 * stepBrightness,
     };
   }));
 }
