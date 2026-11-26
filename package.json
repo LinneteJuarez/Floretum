@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run convert:splats && vite build",
+    "convert:flowers": "node scripts/convert-houdini-splats.mjs",
     "preview": "vite preview",
     "convert:splats": "node scripts/convert-splats.mjs"
   },
