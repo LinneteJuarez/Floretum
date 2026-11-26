@@ -92,6 +92,10 @@ h1 { font: 500 clamp(3rem, 8vw, 5rem)/.95 var(--font-display); letter-spacing: -
 .viewer::after { content: ""; position: absolute; z-index: 0; left: 50%; top: 67%; width: min(54%, 230px); height: 14px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(0, 0, 0, .42), rgba(0, 0, 0, .12) 44%, transparent 74%); pointer-events: none; }
 .viewer canvas { position: absolute !important; z-index: 1; inset: 0 !important; width: 100% !important; height: 100% !important; display: block; }
 .viewer.is-ready { cursor: grab; }
+.viewer .viewer-sound-toggle { position: absolute; right: 14px; bottom: 14px; z-index: 7; display: grid; place-items: center; width: 46px; height: 46px; padding: 0; border-radius: 50%; background: var(--color-bg); color: var(--color-text); }
+.viewer .viewer-sound-toggle:hover, .viewer .viewer-sound-toggle[aria-pressed='true'] { color: var(--color-accent-yellow); border-color: var(--color-accent-yellow); }
+.viewer-sound-slash { stroke: var(--color-accent-red); }
+.viewer-sound-error { position: absolute; right: 70px; bottom: 14px; z-index: 7; margin: 0; padding: 8px; color: var(--color-accent-red); background: var(--color-bg); }
 /* Máscaras de rayos X: el cover tapa el Gaussian y el canvas de puntos queda encima. */
 .point-mask-layer { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
 .point-mask-cover, .point-mask { position: absolute; width: clamp(92px, 20%, 148px); aspect-ratio: 1; min-height: 0; transform: translate(-50%, -50%); }

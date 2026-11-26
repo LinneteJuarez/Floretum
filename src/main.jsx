@@ -170,7 +170,7 @@ function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onSto
   </div>;
 }
 
-function SplatViewer({ specimen }) {
+function SplatViewer({ specimen, soundEnabled, onSoundEnabledChange }) {
   // Carga el archivo .ksplat y mantiene la cámara principal del Gaussian.
   // viewerRef se comparte con PointMaskLayer para sincronizar zoom y movimiento.
   const hostRef = useRef(null);
@@ -234,6 +234,7 @@ function SplatViewer({ specimen }) {
   return <>
     <div className={`viewer ${state === 'ready' ? 'is-ready' : ''}`} ref={hostRef} role="region" aria-label={`Gaussian Splat de ${specimen.name}`}>
       <span className="viewer-index">{specimen.number} / DALIA</span>
+      <SpecimenAudio specimen={specimen} hostRef={hostRef} viewerRef={viewerRef} ready={state === 'ready'} enabled={soundEnabled} onEnabledChange={onSoundEnabledChange} />
       {state === 'ready' && <PointMaskLayer specimen={specimen} masks={masks} viewerRef={viewerRef} onStartDrag={startMaskDrag} onMove={moveMask} onStopDrag={stopMaskDrag} />}
       {state !== 'ready' && <div className={`viewer-prompt ${state === 'error' ? 'is-error' : ''}`} role={state === 'error' ? 'alert' : 'status'} aria-live="polite"><strong>{state === 'loading' ? loadStatus : 'No se pudo abrir el archivo'}</strong>{state === 'loading' && <><span>{progress}% · La flor está tomando forma</span><span className="load-track" role="progressbar" aria-label="Progreso de carga" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress}><span style={{ width: `${Math.max(progress, 4)}%` }} /></span></>}{state === 'error' && <><span>Comprueba la conexión o intenta cargar el espécimen de nuevo.</span><button type="button" onClick={() => setRetryKey((key) => key + 1)}>Reintentar carga</button></>}</div>}
     </div>
@@ -241,14 +242,13 @@ function SplatViewer({ specimen }) {
   </>;
 }
 
-function SpecimenCard({ specimen }) {
+function SpecimenCard({ specimen, soundEnabled, onSoundEnabledChange }) {
   // Ficha visual de cada especie: visor, nombre y datos botánicos expandibles.
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
     <motion.article className="specimen" initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.25 }} transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}>
-      <SplatViewer specimen={specimen} />
-      <SpecimenAudio specimen={specimen} />
+      <SplatViewer specimen={specimen} soundEnabled={soundEnabled} onSoundEnabledChange={onSoundEnabledChange} />
       <motion.div className="caption" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, amount: 0.4 }} transition={{ duration: 0.6, delay: 0.15 }}>
         <div className="caption-copy">
           <h2>{specimen.name}</h2>
@@ -359,6 +359,7 @@ function DaliaAssistant() {
 function App() {
   // Estado global de la página: especie activa, navegación y scroll suave.
   const [specimenIndex, setSpecimenIndex] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const specimen = specimens[specimenIndex];
   const [activeSection, setActiveSection] = useState('inicio');
 
@@ -435,7 +436,7 @@ function App() {
       <motion.section className="specimens hero-stage" id="flores" aria-label="Colección de dalias" initial={{ opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}>
         <motion.span className="stage-label stage-label-left" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 1 }}>Vista principal</motion.span>
         <motion.span className="stage-label stage-label-right" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 1.1 }}>Arrastra para explorar</motion.span>
-        <SpecimenCard key={specimen.id} specimen={specimen} />
+        <SpecimenCard key={specimen.id} specimen={specimen} soundEnabled={soundEnabled} onSoundEnabledChange={setSoundEnabled} />
         <motion.a className="scroll-cue" href="#archivo" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 1.2 }}><span>↓</span> Explorar archivo</motion.a>
       </motion.section>
       <DaliaAssistant />

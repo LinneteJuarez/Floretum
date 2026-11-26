@@ -1,7 +1,7 @@
 const POINT_BYTES = 16;
 const SECTOR_COUNT = 48;
-const DURATION = 16;
-const PENTATONIC_NOTES = [60, 62, 64, 67, 69, 72];
+export const DURATION = 16;
+export const PENTATONIC_NOTES = [60, 62, 64, 67, 69, 72];
 
 //lectura del archivo de puntos escaneo
 export async function loadPointCloud(specimen, signal) {
@@ -54,8 +54,8 @@ export function buildSoundEvents(points, center) {
       const noteIndex = Math.round(normalizedRadius * (PENTATONIC_NOTES.length - 1));
   
       const fraction = radii.length / pointCount;
-      const velocity = 0.15 + 0.65 * Math.min(1, Math.sqrt(fraction / 0.06));
-      const angle = ((index + 0.5) / SECTOR_COUNT) * fullTurn;
+      const velocity = 0.05 + 0.35 * Math.min(1, Math.sqrt(fraction / 0.06));
+      const angle = ((index + 0.15) / SECTOR_COUNT) * fullTurn;
   
       return [{
         time: index * secondsPerSector,
