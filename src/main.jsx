@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import Lenis from 'lenis';
@@ -274,7 +274,7 @@ function SpecimenCard({ specimen, soundEnabled, onSoundEnabledChange }) {
   );
 }
 
-function DaliaAssistant() {
+function DaliaAssistant({ specimen, onSpeciesData }) {
   // Vite redirige esta ruta al Webhook local:
   // http://localhost:5678/webhook-test/dalia
   const n8nWebhookUrl = '/api/n8n/webhook-test/dalia';
@@ -308,13 +308,32 @@ function DaliaAssistant() {
       const response = await fetch(n8nWebhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pregunta }),
+        body: JSON.stringify({
+          especie: specimen.dataId,
+          pregunta,
+        }),
       });
 
       if (!response.ok) throw new Error('No se pudo conectar con n8n');
 
-      const data = await response.json();
-      setRespuesta(data.respuesta || 'n8n no devolvió una respuesta.');
+      const rawResponse = await response.text();
+      if (!rawResponse.trim()) {
+        throw new Error('EMPTY_N8N_RESPONSE');
+      }
+
+      let data = JSON.parse(rawResponse);
+      // n8n puede devolver el objeto directamente o envolverlo en un arreglo/items.
+      if (Array.isArray(data)) data = data[0] ?? {};
+      if (Array.isArray(data.items)) data = data.items[0] ?? {};
+
+      if (data.error) throw new Error(data.error);
+      if (data.especie) onSpeciesData?.(data.especie);
+      setRespuesta(
+        data.respuesta ||
+        data.visual?.descripcion ||
+        data.especie?.descripcion ||
+        'n8n no devolvió una respuesta.'
+      );
     } catch (requestError) {
       console.error(requestError);
       setError('No fue posible obtener una respuesta. Verifica que n8n esté ejecutándose.');
@@ -362,9 +381,27 @@ function App() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const specimen = specimens[specimenIndex];
   const [activeSection, setActiveSection] = useState('inicio');
+  const [databaseFlower, setDatabaseFlower] = useState(null);
+
+  const displaySpecimen = useMemo(() => ({
+    ...specimen,
+    name: databaseFlower?.nombreLocal || databaseFlower?.nombre || specimen.name,
+    scientific: databaseFlower?.nombreCientifico || specimen.scientific,
+    botanical: {
+      ...specimen.botanical,
+      family: databaseFlower?.familia || specimen.botanical.family,
+      color: databaseFlower?.color || specimen.botanical.color,
+      description: databaseFlower?.descripcion || specimen.botanical.description,
+    },
+  }), [specimen, databaseFlower]);
+
+  useEffect(() => {
+    document.title = `Floretum · ${displaySpecimen.name}`;
+  }, [displaySpecimen.name]);
 
   const selectSpecimen = (nextIndex) => {
     setSpecimenIndex((nextIndex + specimens.length) % specimens.length);
+    setDatabaseFlower(null);
     const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
     window.requestAnimationFrame(() => document.getElementById('inicio')?.scrollIntoView({ behavior, block: 'start' }));
   };
@@ -413,12 +450,12 @@ function App() {
       <section className="intro hero-intro" id="inicio">
         <motion.div className="hero-copy" initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.85, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}>
           <p className="eyebrow">Archivo vegetal · espécimen {specimen.number}</p>
-          <h1 key={specimen.id}>{specimen.name}</h1>
+          <h1 key={`${specimen.id}-${displaySpecimen.name}`}>{displaySpecimen.name}</h1>
           <p>Una flor registrada como materia, color y datos. Explórala en tres dimensiones y cambia la forma en que la observas.</p>
         </motion.div>
         <motion.div className="hero-meta" aria-label="Datos del espécimen" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12, delayChildren: 0.35 } } }}>
           {[
-            [specimen.scientific, 'Nombre científico'],
+            [displaySpecimen.scientific, 'Nombre científico'],
             [`${specimen.number} / 02`, 'Archivo visual'],
             ['CDMX · 2026', 'Registro'],
           ].map(([value, label]) => (
@@ -436,10 +473,10 @@ function App() {
       <motion.section className="specimens hero-stage" id="flores" aria-label="Colección de dalias" initial={{ opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}>
         <motion.span className="stage-label stage-label-left" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 1 }}>Vista principal</motion.span>
         <motion.span className="stage-label stage-label-right" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 1.1 }}>Arrastra para explorar</motion.span>
-        <SpecimenCard key={specimen.id} specimen={specimen} soundEnabled={soundEnabled} onSoundEnabledChange={setSoundEnabled} />
+        <SpecimenCard key={`${specimen.id}-${displaySpecimen.name}`} specimen={displaySpecimen} soundEnabled={soundEnabled} onSoundEnabledChange={setSoundEnabled} />
         <motion.a className="scroll-cue" href="#archivo" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 1.2 }}><span>↓</span> Explorar archivo</motion.a>
       </motion.section>
-      <DaliaAssistant />
+      <DaliaAssistant specimen={specimen} onSpeciesData={setDatabaseFlower} />
       <motion.section className="archive-anchor" id="archivo" aria-label="Archivo botánico" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.7 }}><span>Archivo botánico</span></motion.section>
       <footer>Floretum · Archivo visual de dalias</footer>
     </main>
