@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
       }] : []),
     ],
     define: {
-      'import.meta.env.VITE_SCAN_BASE_URL': JSON.stringify(pages ? scanBaseUrl : ''),
+      'import.meta.env.VITE_SCAN_BASE_URL': JSON.stringify(scanBaseUrl),
     },
     server: {
       port: 3002,

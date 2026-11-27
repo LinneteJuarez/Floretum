@@ -10,8 +10,10 @@ public/scans/*.ksplat
 public/scans/*.points.bin
 public/scans/dalia-moco-full.splat
 
-# El visor Spark usa la versión SPZ comprimida de DALIAMOCO.
-!public/scans/dalia-moco-full.points.bin
+# El visor carga estos archivos de R2. Los scripts pueden regenerarlos localmente.
+public/scans/dalia-moco-full.spz
+dist/client/scans/dalia-moco-full.spz
+dist/client/scans/dalia-moco-full.points.bin
 
 !public/scans/dalia-moco.ksplat
 !public/scans/dalia-moco.points.bin

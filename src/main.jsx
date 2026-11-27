@@ -15,10 +15,8 @@ import SpecimenAudio from './audio/SpecimenAudio.jsx';
 import './style.css';
 
 function scanUrl(filename) {
-  const base = import.meta.env.VITE_SCAN_BASE_URL;
-  return base
-    ? `${base.replace(/\/+$/, '')}/${encodeURIComponent(filename)}`
-    : `${import.meta.env.BASE_URL}scans/${filename}`;
+  const base = import.meta.env.VITE_SCAN_BASE_URL.replace(/\/+$/, '');
+  return `${base}/${encodeURIComponent(filename)}`;
 }
 
 // Capa de rayos X: el Gaussian permanece debajo y cada máscara recorta
