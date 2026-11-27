@@ -10,9 +10,14 @@ export async function loadSoundProfile(id, signal) {
     || (import.meta.env.DEV ? LOCAL_ENDPOINT : '');
   if (!endpoint || !id) return null;
 
+  const timeoutController = new AbortController();
+  const timeoutId = window.setTimeout(() => timeoutController.abort(), 1500);
+  const abortRequest = () => timeoutController.abort();
+  signal.addEventListener('abort', abortRequest, { once: true });
+
   try {
     const response = await fetch(`${endpoint.replace(/\/$/, '')}/${encodeURIComponent(id)}`, {
-      signal: AbortSignal.any([signal, AbortSignal.timeout(1500)]),
+      signal: timeoutController.signal,
     });
     if (!response.ok) return null;
 
@@ -25,5 +30,8 @@ export async function loadSoundProfile(id, signal) {
     return valid ? profile : null;
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal.removeEventListener('abort', abortRequest);
   }
 }

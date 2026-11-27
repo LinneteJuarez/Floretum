@@ -9,5 +9,9 @@ public/scans/*.ksplat
 public/scans/*.points.bin
 public/scans/dalia-moco-full.splat
 
+# El visor Spark usa el escaneo completo de DALIAMOCO en local y en deploy.
+!public/scans/dalia-moco-full.splat
+!public/scans/dalia-moco-full.points.bin
+
 !public/scans/dalia-moco.ksplat
 !public/scans/dalia-moco.points.bin

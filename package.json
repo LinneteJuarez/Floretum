@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0 --port 3002",
     "build": "npm run convert:splats && vite build",
     "convert:flowers": "node scripts/convert-houdini-splats.mjs",
     "preview": "vite preview",
