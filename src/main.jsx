@@ -14,6 +14,13 @@ import {
 import SpecimenAudio from './audio/SpecimenAudio.jsx';
 import './style.css';
 
+function scanUrl(filename) {
+  const base = import.meta.env.VITE_SCAN_BASE_URL;
+  return base
+    ? `${base.replace(/\/+$/, '')}/${encodeURIComponent(filename)}`
+    : `${import.meta.env.BASE_URL}scans/${filename}`;
+}
+
 // Capa de rayos X: el Gaussian permanece debajo y cada máscara recorta
 // una nube de puntos a escala completa, sin volver a centrar la flor.
 function PointMaskLayer({ specimen, hoverTrail, viewerRef }) {
@@ -71,7 +78,7 @@ function PointMaskLayer({ specimen, hoverTrail, viewerRef }) {
 
     async function loadPointCloud() {
       try {
-        const response = await fetch(`${import.meta.env.BASE_URL}scans/${specimen.pointsFile}`);
+        const response = await fetch(scanUrl(specimen.pointsFile));
         if (!response.ok) throw new Error(`No se pudo abrir ${specimen.pointsFile}`);
         const bytes = await response.arrayBuffer();
         if (cancelled || !layerRef.current) return;
@@ -240,7 +247,7 @@ function SplatViewer({ specimen, soundEnabled, onSoundEnabledChange }) {
         resize();
         resizeObserver.observe(host);
         splat = new SplatMesh({
-          url: `${import.meta.env.BASE_URL}scans/${specimen.file}`,
+          url: scanUrl(specimen.file),
           enableLod: false,
           onProgress: ({ loaded, total }) => {
             if (!cancelled && total) setProgress(Math.min(99, Math.round(100 * loaded / total)));
@@ -306,7 +313,7 @@ function SpecimenCard({ specimen, soundEnabled, onSoundEnabledChange }) {
 function DaliaAssistant({ specimen, onSpeciesData }) {
   // Vite redirige esta ruta al Webhook local:
   // http://localhost:5678/webhook-test/dalia
-  const n8nWebhookUrl = '/api/n8n/webhook-test/dalia';
+  const n8nWebhookUrl = import.meta.env.VITE_DALIA_WEBHOOK_URL || '/api/n8n/webhook-test/dalia';
   const [pregunta, setPregunta] = useState('nombre_cientifico');
   const [respuesta, setRespuesta] = useState('');
   const [loading, setLoading] = useState(false);

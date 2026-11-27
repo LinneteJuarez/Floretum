@@ -5,6 +5,7 @@ dist/scans-web/
 dist/scans-web2/
 
 node_modules/
+dist/pages/
 public/scans/*.ksplat
 public/scans/*.points.bin
 public/scans/dalia-moco-full.splat
