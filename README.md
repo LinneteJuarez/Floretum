@@ -8,7 +8,7 @@ Archivo visual de dalias construido con React, Vite, Three.js y GaussianSplats3D
 - `src/data/specimens.js`: catálogo editable de especies y sus datos botánicos.
 - `src/shaders/pointCloud.js`: material GPU de la nube de puntos, tamaño de partícula y ruido animado.
 - `src/style.css`: sistema visual, layout, estados, máscaras y responsive.
-- `public/scans/`: archivos `.ksplat` y `.points.bin` usados por cada espécimen.
+- `public/scans/`: archivos `.spz`, `.ksplat` y `.points.bin` usados por cada espécimen.
 - `scripts/convert-splats.mjs`: convierte los `.ply` fuente en Gaussian splats y nubes de puntos.
 
 ## Editar una especie
@@ -50,4 +50,8 @@ node scripts/convert-dalia-full.mjs 'D:/CC/TESIS/Gaussians/cleanGaussians/dalia_
 npm run dev
 ```
 
-La conversión guarda los 3,208,929 splats en `public/scans/dalia-moco-full.splat` y los puntos para el audio y los rayos X en `public/scans/dalia-moco-full.points.bin`. Los archivos se generan localmente y deben existir antes de compilar el sitio.
+La conversión guarda los 3,208,929 splats en `public/scans/dalia-moco-full.spz` (formato comprimido compatible con Spark) y los puntos para el audio y los rayos X en `public/scans/dalia-moco-full.points.bin`. Para regenerar el SPZ desde el archivo completo original:
+
+```powershell
+npm run convert:spz
+```

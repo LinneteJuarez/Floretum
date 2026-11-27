@@ -7,7 +7,7 @@ export const specimens = [
     name: 'Dalia amarilla',
     scientific: 'Dahlia pinnata Cav.',
     note: 'Registro MOCO · color variable',
-    file: 'dalia-moco-full.splat',
+    file: 'dalia-moco-full.spz',
     pointsFile: 'dalia-moco-full.points.bin',
     splatCount: 3_208_929,
     center: [-0.24929, -1.11306, -1.22811],
