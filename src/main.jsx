@@ -202,11 +202,20 @@ function SplatViewer({ specimen }) {
       try {
         const GaussianSplats3D = await import('@mkkellogg/gaussian-splats-3d');
         if (cancelled) return;
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const viewer = new GaussianSplats3D.Viewer({ rootElement: hostRef.current, sharedMemoryForWorkers: false, gpuAcceleratedSort: false, enableSIMDInSort: true, useBuiltInControls: true, sphericalHarmonicsDegree: 0, inMemoryCompressionLevel: 2, freeIntermediateSplatData: true, initialCameraPosition: [specimen.center[0], specimen.center[1], specimen.center[2] + specimen.cameraDistance], initialCameraLookAt: specimen.center, cameraUp: [0, 1, 0] });
         viewerRef.current = viewer;
         await viewer.addSplatScene(`${import.meta.env.BASE_URL}scans/${specimen.file}`, { showLoadingUI: false, progressiveLoad: true, optimizeSplatData: true, onProgress: (percentComplete) => { if (!cancelled) { setProgress(Math.round(percentComplete)); setLoadStatus(percentComplete >= 100 ? 'Procesando estructura' : 'Descargando Gaussian'); } } });
         if (cancelled) return;
         viewer.start();
+        // La órbita lenta da vida al espécimen sin convertirlo en una animación inquieta.
+        // Se respeta la preferencia de movimiento reducido del sistema.
+        if (viewer.controls) {
+          viewer.controls.autoRotate = !reducedMotion;
+          viewer.controls.autoRotateSpeed = 0.55;
+          viewer.controls.enablePan = false;
+          viewer.controls.enableDamping = true;
+        }
         setProgress(100);
         setLoadStatus('Visor listo');
         setState('ready');

@@ -10,7 +10,7 @@ export const specimens = [
     file: 'dalia-moco.ksplat',
     pointsFile: 'dalia-moco.points.bin',
     center: [-0.24929, -1.11306, -1.22811],
-    cameraDistance: 3,
+    cameraDistance: 4.05,
     accent: '#d8b84c',
     glow: 'rgba(216, 184, 76, .18)',
     botanical: {
