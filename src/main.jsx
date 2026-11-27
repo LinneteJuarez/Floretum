@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AnimatePresence, MotionConfig, motion } from 'motion/react';
+import { MotionConfig, motion } from 'motion/react';
 import Lenis from 'lenis';
 import * as THREE from 'three';
 import { specimens } from './data/specimens';
@@ -10,34 +10,50 @@ import {
   POINT_CLOUD_CAMERA_SCALE,
   POINT_CLOUD_RENDER_FPS,
 } from './shaders/pointCloud';
-import SpecimenAudio from './audio/SpecimenAudio.jsx';
 import './style.css';
 
 // Capa de rayos X: el Gaussian permanece debajo y cada máscara recorta
 // una nube de puntos a escala completa, sin volver a centrar la flor.
-function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onStopDrag }) {
+function PointMaskLayer({ specimen, hoverTrail, viewerRef }) {
   const layerRef = useRef(null);
-  const masksRef = useRef(masks);
-  masksRef.current = masks;
+  const hoverTrailRef = useRef(hoverTrail);
+  hoverTrailRef.current = hoverTrail;
 
   const alignCanvases = () => {
     const layer = layerRef.current;
     if (!layer) return;
     const fullWidth = layer.clientWidth;
     const fullHeight = layer.clientHeight;
-    masksRef.current.forEach((mask) => {
-      const maskElement = layer.querySelector(`[data-mask="${mask.id}"]`);
-      const canvas = layer.querySelector(`[data-point-canvas="${mask.id}"]`);
-      if (!maskElement || !canvas) return;
-      const maskWidth = maskElement.clientWidth || 120;
-      const maskHeight = maskElement.clientHeight || 120;
-      const left = mask.x / 100 * fullWidth - maskWidth / 2;
-      const top = mask.y / 100 * fullHeight - maskHeight / 2;
-      canvas.style.clipPath = `inset(${top}px ${Math.max(0, fullWidth - left - maskWidth)}px ${Math.max(0, fullHeight - top - maskHeight)}px ${Math.max(0, left)}px)`;
+    const canvas = layer.querySelector('[data-point-canvas="hover"]');
+    if (!canvas) return;
+    const trail = hoverTrailRef.current;
+    if (!trail.length) {
+      canvas.style.clipPath = 'inset(100% 0 0 0)';
+      canvas.style.maskImage = 'none';
+      canvas.style.webkitMaskImage = 'none';
+      canvas.style.opacity = '0';
+      canvas.style.filter = 'none';
+      return;
+    }
+    const recentTrail = trail.slice(-9);
+    const radialMasks = recentTrail.map((point, index) => {
+      const freshness = (index + 1) / recentTrail.length;
+      const radius = Math.min(Math.max(fullWidth * (0.045 + freshness * 0.025), 24), 42);
+      const alpha = 0.18 + freshness * 0.8;
+      return `radial-gradient(circle ${radius}px at ${point.x}% ${point.y}%, rgba(0, 0, 0, ${alpha}) 0%, rgba(0, 0, 0, ${alpha * 0.82}) 46%, rgba(0, 0, 0, ${alpha * 0.38}) 72%, rgba(0, 0, 0, 0) 100%)`;
     });
+    const radialMask = radialMasks.join(', ');
+    canvas.style.clipPath = 'none';
+    canvas.style.maskImage = radialMask;
+    canvas.style.webkitMaskImage = radialMask;
+    canvas.style.maskComposite = 'add';
+    canvas.style.webkitMaskComposite = 'source-over';
+    canvas.style.opacity = '0.96';
+    canvas.style.filter = 'none';
+    canvas.style.mixBlendMode = 'screen';
   };
 
-  useEffect(() => { window.requestAnimationFrame(alignCanvases); }, [masks]);
+  useEffect(() => { window.requestAnimationFrame(alignCanvases); }, [hoverTrail]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,28 +91,26 @@ function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onSto
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
         material = createPointCloudMaterial();
 
-        masks.forEach((mask) => {
-          const scene = new THREE.Scene();
-          // Match GaussianSplats3D's default perspective exactly so the point
-          // cloud occupies the same pixels as the underlying Gaussian.
-          const camera = new THREE.PerspectiveCamera(POINT_CLOUD_CAMERA_FOV, (layerRef.current.clientWidth || 1) / (layerRef.current.clientHeight || 1), 0.01, 100);
-          camera.position.set(0, 0, specimen.cameraDistance * POINT_CLOUD_CAMERA_SCALE);
-          camera.up.set(0, -1, 0);
-          camera.lookAt(0, 0, 0);
-          scene.add(new THREE.Points(geometry, material));
-          const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-          renderer.setClearColor(0x000000, 0);
-          renderer.domElement.dataset.pointCanvas = mask.id;
-          renderer.domElement.style.position = 'absolute';
-          renderer.domElement.style.left = '0px';
-          renderer.domElement.style.top = '0px';
-          renderer.domElement.style.zIndex = '5';
-          renderer.domElement.style.pointerEvents = 'none';
-          layerRef.current.appendChild(renderer.domElement);
-          renderers.push(renderer);
-          cameras.push({ renderer, camera, scene });
-        });
+        const scene = new THREE.Scene();
+        // Match GaussianSplats3D's perspective so the hover cloud stays registered.
+        const camera = new THREE.PerspectiveCamera(POINT_CLOUD_CAMERA_FOV, (layerRef.current.clientWidth || 1) / (layerRef.current.clientHeight || 1), 0.01, 100);
+        camera.position.set(0, 0, specimen.cameraDistance * POINT_CLOUD_CAMERA_SCALE);
+        camera.up.set(0, 1, 0);
+        camera.lookAt(0, 0, 0);
+        scene.add(new THREE.Points(geometry, material));
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.setClearColor(0x000000, 0);
+        renderer.domElement.dataset.pointCanvas = 'hover';
+        renderer.domElement.style.position = 'absolute';
+        renderer.domElement.style.left = '0px';
+        renderer.domElement.style.top = '0px';
+        renderer.domElement.style.zIndex = '5';
+        renderer.domElement.style.pointerEvents = 'none';
+        renderer.domElement.style.opacity = '0';
+        layerRef.current.appendChild(renderer.domElement);
+        renderers.push(renderer);
+        cameras.push({ renderer, camera, scene });
 
         const resize = () => {
           const width = layerRef.current?.clientWidth || 120;
@@ -162,15 +176,10 @@ function PointMaskLayer({ specimen, masks, viewerRef, onStartDrag, onMove, onSto
     };
   }, [specimen]);
 
-  return <div className="point-mask-layer" ref={layerRef} aria-label="Máscaras móviles de análisis">
-    {masks.map((mask) => <div key={`${mask.id}-cover`} className="point-mask-cover" style={{ left: `${mask.x}%`, top: `${mask.y}%` }} aria-hidden="true" />)}
-    {masks.map((mask) => <div key={mask.id} className="point-mask" data-mask={mask.id} style={{ left: `${mask.x}%`, top: `${mask.y}%` }} role="button" tabIndex="0" aria-label={`Máscara ${mask.id}. Arrastra para moverla`} onPointerDown={(event) => onStartDrag(event, mask)} onPointerMove={(event) => onMove(event, mask.id)} onPointerUp={onStopDrag} onPointerCancel={onStopDrag}>
-      <span>{mask.id}</span>
-    </div>)}
-  </div>;
+  return <div className="point-mask-layer" ref={layerRef} aria-hidden="true" />;
 }
 
-function SplatViewer({ specimen, soundEnabled, onSoundEnabledChange }) {
+function SplatViewer({ specimen }) {
   // Carga el archivo .ksplat y mantiene la cámara principal del Gaussian.
   // viewerRef se comparte con PointMaskLayer para sincronizar zoom y movimiento.
   const hostRef = useRef(null);
@@ -179,8 +188,7 @@ function SplatViewer({ specimen, soundEnabled, onSoundEnabledChange }) {
   const [progress, setProgress] = useState(0);
   const [loadStatus, setLoadStatus] = useState('Preparando visor');
   const [retryKey, setRetryKey] = useState(0);
-  const [masks, setMasks] = useState([{ id: 'M1', x: 24, y: 58 }, { id: 'M2', x: 66, y: 46 }]);
-  const dragRef = useRef(null);
+  const [hoverTrail, setHoverTrail] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,11 +202,20 @@ function SplatViewer({ specimen, soundEnabled, onSoundEnabledChange }) {
       try {
         const GaussianSplats3D = await import('@mkkellogg/gaussian-splats-3d');
         if (cancelled) return;
-        const viewer = new GaussianSplats3D.Viewer({ rootElement: hostRef.current, sharedMemoryForWorkers: false, gpuAcceleratedSort: false, enableSIMDInSort: true, useBuiltInControls: true, sphericalHarmonicsDegree: 0, inMemoryCompressionLevel: 2, freeIntermediateSplatData: true, initialCameraPosition: [specimen.center[0], specimen.center[1], specimen.center[2] + specimen.cameraDistance], initialCameraLookAt: specimen.center, cameraUp: [0, -1, 0] });
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const viewer = new GaussianSplats3D.Viewer({ rootElement: hostRef.current, sharedMemoryForWorkers: false, gpuAcceleratedSort: false, enableSIMDInSort: true, useBuiltInControls: true, sphericalHarmonicsDegree: 0, inMemoryCompressionLevel: 2, freeIntermediateSplatData: true, initialCameraPosition: [specimen.center[0], specimen.center[1], specimen.center[2] + specimen.cameraDistance], initialCameraLookAt: specimen.center, cameraUp: [0, 1, 0] });
         viewerRef.current = viewer;
         await viewer.addSplatScene(`${import.meta.env.BASE_URL}scans/${specimen.file}`, { showLoadingUI: false, progressiveLoad: true, optimizeSplatData: true, onProgress: (percentComplete) => { if (!cancelled) { setProgress(Math.round(percentComplete)); setLoadStatus(percentComplete >= 100 ? 'Procesando estructura' : 'Descargando Gaussian'); } } });
         if (cancelled) return;
         viewer.start();
+        // La órbita lenta da vida al espécimen sin convertirlo en una animación inquieta.
+        // Se respeta la preferencia de movimiento reducido del sistema.
+        if (viewer.controls) {
+          viewer.controls.autoRotate = !reducedMotion;
+          viewer.controls.autoRotateSpeed = 0.55;
+          viewer.controls.enablePan = false;
+          viewer.controls.enableDamping = true;
+        }
         setProgress(100);
         setLoadStatus('Visor listo');
         setState('ready');
@@ -215,61 +232,31 @@ function SplatViewer({ specimen, soundEnabled, onSoundEnabledChange }) {
     return () => { cancelled = true; viewerRef.current?.dispose?.(); viewerRef.current = null; };
   }, [specimen, retryKey]);
 
-  const moveMask = (event, maskId) => {
-    const drag = dragRef.current;
-    if (!drag || drag.id !== maskId || !hostRef.current) return;
-    const bounds = hostRef.current.getBoundingClientRect();
-    const x = Math.max(2, Math.min(76, ((event.clientX - bounds.left) / bounds.width) * 100 - drag.offsetX));
-    const y = Math.max(2, Math.min(76, ((event.clientY - bounds.top) / bounds.height) * 100 - drag.offsetY));
-    setMasks((current) => current.map((mask) => mask.id === maskId ? { ...mask, x, y } : mask));
-  };
-  const startMaskDrag = (event, mask) => {
+  const updateHoverPoint = (event) => {
     if (!hostRef.current) return;
     const bounds = hostRef.current.getBoundingClientRect();
-    dragRef.current = { id: mask.id, offsetX: ((event.clientX - bounds.left) / bounds.width) * 100 - mask.x, offsetY: ((event.clientY - bounds.top) / bounds.height) * 100 - mask.y };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const nextPoint = {
+      x: Math.max(0, Math.min(100, ((event.clientX - bounds.left) / bounds.width) * 100)),
+      y: Math.max(0, Math.min(100, ((event.clientY - bounds.top) / bounds.height) * 100)),
+    };
+    setHoverTrail((current) => [...current, nextPoint].slice(-14));
   };
-  const stopMaskDrag = (event) => { dragRef.current = null; event.currentTarget.releasePointerCapture?.(event.pointerId); };
 
   return <>
-    <div className={`viewer ${state === 'ready' ? 'is-ready' : ''}`} ref={hostRef} role="region" aria-label={`Gaussian Splat de ${specimen.name}`}>
+    <div className={`viewer ${state === 'ready' ? 'is-ready' : ''}`} ref={hostRef} role="region" aria-label={`Gaussian Splat de ${specimen.name}`} onPointerMove={updateHoverPoint} onPointerLeave={() => setHoverTrail([])}>
       <span className="viewer-index">{specimen.number} / DALIA</span>
-      <SpecimenAudio specimen={specimen} hostRef={hostRef} viewerRef={viewerRef} ready={state === 'ready'} enabled={soundEnabled} onEnabledChange={onSoundEnabledChange} />
-      {state === 'ready' && <PointMaskLayer specimen={specimen} masks={masks} viewerRef={viewerRef} onStartDrag={startMaskDrag} onMove={moveMask} onStopDrag={stopMaskDrag} />}
+      {state === 'ready' && <PointMaskLayer specimen={specimen} hoverTrail={hoverTrail} viewerRef={viewerRef} />}
       {state !== 'ready' && <div className={`viewer-prompt ${state === 'error' ? 'is-error' : ''}`} role={state === 'error' ? 'alert' : 'status'} aria-live="polite"><strong>{state === 'loading' ? loadStatus : 'No se pudo abrir el archivo'}</strong>{state === 'loading' && <><span>{progress}% · La flor está tomando forma</span><span className="load-track" role="progressbar" aria-label="Progreso de carga" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress}><span style={{ width: `${Math.max(progress, 4)}%` }} /></span></>}{state === 'error' && <><span>Comprueba la conexión o intenta cargar el espécimen de nuevo.</span><button type="button" onClick={() => setRetryKey((key) => key + 1)}>Reintentar carga</button></>}</div>}
     </div>
-    <div className="viewer-toolbar"><div className="mode-heading"><span>Gaussian · análisis de puntos</span><small>Mueve M1 y M2 para revelar la estructura</small></div></div>
   </>;
 }
 
-function SpecimenCard({ specimen, soundEnabled, onSoundEnabledChange }) {
-  // Ficha visual de cada especie: visor, nombre y datos botánicos expandibles.
-  const [detailsOpen, setDetailsOpen] = useState(false);
+function SpecimenCard({ specimen }) {
+  // Visor principal del espécimen.
 
   return (
     <motion.article className="specimen" initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.25 }} transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}>
-      <SplatViewer specimen={specimen} soundEnabled={soundEnabled} onSoundEnabledChange={onSoundEnabledChange} />
-      <motion.div className="caption" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true, amount: 0.4 }} transition={{ duration: 0.6, delay: 0.15 }}>
-        <div className="caption-copy">
-          <h2>{specimen.name}</h2>
-          <p><i>{specimen.scientific}</i><span>{specimen.note}</span></p>
-        </div>
-        <button type="button" className="botanical-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)}>
-          <span>{detailsOpen ? 'Cerrar ficha' : 'Abrir ficha botánica'}</span><span aria-hidden="true">{detailsOpen ? '↑' : '↓'}</span>
-        </button>
-        <AnimatePresence initial={false}>
-          {detailsOpen && (
-            <motion.div className="botanical-sheet" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
-              <div className="botanical-grid">
-                <span><small>Familia</small><b>{specimen.botanical.family}</b></span>
-                <span><small>Color registrado</small><b>{specimen.botanical.color}</b></span>
-                <span><small>Densidad visual</small><b>{specimen.botanical.scan}</b></span>
-              </div>
-              <p className="botanical-description">{specimen.botanical.description}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      <SplatViewer specimen={specimen} />
     </motion.article>
   );
 }
@@ -378,12 +365,11 @@ function DaliaAssistant({ specimen, onSpeciesData }) {
 function App() {
   // Estado global de la página: especie activa, navegación y scroll suave.
   const [specimenIndex, setSpecimenIndex] = useState(0);
-  const [soundEnabled, setSoundEnabled] = useState(false);
   const specimen = specimens[specimenIndex];
   const [activeSection, setActiveSection] = useState('inicio');
   const [databaseFlower, setDatabaseFlower] = useState(null);
 
-  const displaySpecimen = useMemo(() => ({
+  const displaySpecimen = {
     ...specimen,
     name: databaseFlower?.nombreLocal || databaseFlower?.nombre || specimen.name,
     scientific: databaseFlower?.nombreCientifico || specimen.scientific,
@@ -393,7 +379,7 @@ function App() {
       color: databaseFlower?.color || specimen.botanical.color,
       description: databaseFlower?.descripcion || specimen.botanical.description,
     },
-  }), [specimen, databaseFlower]);
+  };
 
   useEffect(() => {
     document.title = `Floretum · ${displaySpecimen.name}`;
@@ -456,29 +442,27 @@ function App() {
         <motion.div className="hero-meta" aria-label="Datos del espécimen" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12, delayChildren: 0.35 } } }}>
           {[
             [displaySpecimen.scientific, 'Nombre científico'],
-            [`${specimen.number} / 02`, 'Archivo visual'],
+            [`${specimen.number} / ${String(specimens.length).padStart(2, '0')}`, 'Archivo visual'],
             ['CDMX · 2026', 'Registro'],
           ].map(([value, label]) => (
             <motion.span key={label} variants={{ hidden: { opacity: 0, x: 14 }, visible: { opacity: 1, x: 0, transition: { duration: 0.5, ease: 'easeOut' } } }}>
               <b>{value}</b><small>{label}</small>
             </motion.span>
           ))}
-          <div className="specimen-switcher" aria-label="Cambiar de espécimen">
-            <button type="button" aria-label="Espécimen anterior" onClick={() => selectSpecimen(specimenIndex - 1)}>←</button>
-            <span><b>{specimen.number}</b><small>de {String(specimens.length).padStart(2, '0')}</small></span>
-            <button type="button" aria-label="Siguiente espécimen" onClick={() => selectSpecimen(specimenIndex + 1)}>→</button>
-          </div>
+          {specimens.length > 1 && (
+            <div className="specimen-switcher" aria-label="Cambiar de espécimen">
+              <button type="button" aria-label="Espécimen anterior" onClick={() => selectSpecimen(specimenIndex - 1)}>←</button>
+              <span><b>{specimen.number}</b><small>de {String(specimens.length).padStart(2, '0')}</small></span>
+              <button type="button" aria-label="Siguiente espécimen" onClick={() => selectSpecimen(specimenIndex + 1)}>→</button>
+            </div>
+          )}
         </motion.div>
       </section>
       <motion.section className="specimens hero-stage" id="flores" aria-label="Colección de dalias" initial={{ opacity: 0, y: 34 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}>
-        <motion.span className="stage-label stage-label-left" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 1 }}>Vista principal</motion.span>
-        <motion.span className="stage-label stage-label-right" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 1.1 }}>Arrastra para explorar</motion.span>
-        <SpecimenCard key={`${specimen.id}-${displaySpecimen.name}`} specimen={displaySpecimen} soundEnabled={soundEnabled} onSoundEnabledChange={setSoundEnabled} />
-        <motion.a className="scroll-cue" href="#archivo" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 1.2 }}><span>↓</span> Explorar archivo</motion.a>
+        <SpecimenCard key={`${specimen.id}-${displaySpecimen.name}`} specimen={displaySpecimen} />
       </motion.section>
       <DaliaAssistant specimen={specimen} onSpeciesData={setDatabaseFlower} />
-      <motion.section className="archive-anchor" id="archivo" aria-label="Archivo botánico" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.5 }} transition={{ duration: 0.7 }}><span>Archivo botánico</span></motion.section>
-      <footer>Floretum · Archivo visual de dalias</footer>
+      <footer>Floretum · Archivo vivo de flores</footer>
     </main>
   );
 }
