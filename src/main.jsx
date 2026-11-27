@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { MotionConfig, motion } from 'motion/react';
 import Lenis from 'lenis';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import SpecimenAudio from './audio/SpecimenAudio';
 import { specimens } from './data/specimens';
 import {
   createPointCloudMaterial,
@@ -192,44 +194,77 @@ function SplatViewer({ specimen }) {
 
   useEffect(() => {
     let cancelled = false;
+    let dispose = () => {};
     async function load() {
       setState('loading');
       setProgress(0);
       setLoadStatus('Descargando Gaussian');
-      viewerRef.current?.dispose?.();
-      viewerRef.current = null;
-      hostRef.current?.querySelectorAll('canvas').forEach((canvas) => canvas.remove());
       try {
-        const GaussianSplats3D = await import('@mkkellogg/gaussian-splats-3d');
+        const { SparkRenderer, SplatMesh } = await import('@sparkjsdev/spark');
         if (cancelled) return;
-        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const viewer = new GaussianSplats3D.Viewer({ rootElement: hostRef.current, sharedMemoryForWorkers: false, gpuAcceleratedSort: false, enableSIMDInSort: true, useBuiltInControls: true, sphericalHarmonicsDegree: 0, inMemoryCompressionLevel: 2, freeIntermediateSplatData: true, initialCameraPosition: [specimen.center[0], specimen.center[1], specimen.center[2] + specimen.cameraDistance], initialCameraLookAt: specimen.center, cameraUp: [0, 1, 0] });
-        viewerRef.current = viewer;
-        await viewer.addSplatScene(`${import.meta.env.BASE_URL}scans/${specimen.file}`, { showLoadingUI: false, progressiveLoad: true, optimizeSplatData: true, onProgress: (percentComplete) => { if (!cancelled) { setProgress(Math.round(percentComplete)); setLoadStatus(percentComplete >= 100 ? 'Procesando estructura' : 'Descargando Gaussian'); } } });
-        if (cancelled) return;
-        viewer.start();
-        // La órbita lenta da vida al espécimen sin convertirlo en una animación inquieta.
-        // Se respeta la preferencia de movimiento reducido del sistema.
-        if (viewer.controls) {
-          viewer.controls.autoRotate = !reducedMotion;
-          viewer.controls.autoRotateSpeed = 0.55;
-          viewer.controls.enablePan = false;
-          viewer.controls.enableDamping = true;
+        const host = hostRef.current;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(POINT_CLOUD_CAMERA_FOV, 1, 0.01, 100);
+        camera.position.set(specimen.center[0], specimen.center[1], specimen.center[2] + specimen.cameraDistance);
+        const renderer = new THREE.WebGLRenderer({ alpha: true });
+        const canvas = renderer.domElement;
+        const controls = new OrbitControls(camera, canvas);
+        const spark = new SparkRenderer({ renderer });
+        const resizeObserver = new ResizeObserver(resize);
+        let splat;
+        dispose = () => {
+          resizeObserver.disconnect();
+          renderer.setAnimationLoop(null);
+          controls.dispose();
+          splat?.dispose();
+          spark.dispose();
+          renderer.dispose();
+          canvas.remove();
+          viewerRef.current = null;
+          dispose = () => {};
+        };
+        function resize() {
+          const width = Math.max(1, host.clientWidth);
+          const height = Math.max(1, host.clientHeight);
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+          renderer.setSize(width, height, false);
         }
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        controls.target.set(...specimen.center);
+        controls.enablePan = false;
+        controls.enableDamping = true;
+        controls.update();
+        resize();
+        resizeObserver.observe(host);
+        splat = new SplatMesh({
+          url: `${import.meta.env.BASE_URL}scans/${specimen.file}`,
+          onProgress: ({ loaded, total }) => {
+            if (!cancelled && total) setProgress(Math.min(99, Math.round(100 * loaded / total)));
+          },
+        });
+        scene.add(spark, splat);
+        await splat.initialized;
+        if (cancelled) return;
+        host.appendChild(canvas);
+        viewerRef.current = { camera };
+        renderer.setAnimationLoop(() => {
+          controls.update();
+          renderer.render(scene, camera);
+        });
         setProgress(100);
         setLoadStatus('Visor listo');
         setState('ready');
       } catch (error) {
         if (cancelled) return;
         console.error(`No se pudo cargar ${specimen.name}`, error);
-        viewerRef.current?.dispose?.();
-        viewerRef.current = null;
+        dispose();
         setLoadStatus('No se pudo cargar el archivo');
         setState('error');
       }
     }
     load();
-    return () => { cancelled = true; viewerRef.current?.dispose?.(); viewerRef.current = null; };
+    return () => { cancelled = true; dispose(); };
   }, [specimen, retryKey]);
 
   const updateHoverPoint = (event) => {
@@ -246,6 +281,7 @@ function SplatViewer({ specimen }) {
     <div className={`viewer ${state === 'ready' ? 'is-ready' : ''}`} ref={hostRef} role="region" aria-label={`Gaussian Splat de ${specimen.name}`} onPointerMove={updateHoverPoint} onPointerLeave={() => setHoverTrail([])}>
       <span className="viewer-index">{specimen.number} / DALIA</span>
       {state === 'ready' && <PointMaskLayer specimen={specimen} hoverTrail={hoverTrail} viewerRef={viewerRef} />}
+      {state === 'ready' && <SpecimenAudio specimen={specimen} hostRef={hostRef} viewerRef={viewerRef} />}
       {state !== 'ready' && <div className={`viewer-prompt ${state === 'error' ? 'is-error' : ''}`} role={state === 'error' ? 'alert' : 'status'} aria-live="polite"><strong>{state === 'loading' ? loadStatus : 'No se pudo abrir el archivo'}</strong>{state === 'loading' && <><span>{progress}% · La flor está tomando forma</span><span className="load-track" role="progressbar" aria-label="Progreso de carga" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress}><span style={{ width: `${Math.max(progress, 4)}%` }} /></span></>}{state === 'error' && <><span>Comprueba la conexión o intenta cargar el espécimen de nuevo.</span><button type="button" onClick={() => setRetryKey((key) => key + 1)}>Reintentar carga</button></>}</div>}
     </div>
   </>;
