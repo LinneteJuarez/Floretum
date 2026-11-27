@@ -42,12 +42,13 @@ Para validar una versión de producción:
 npm run build
 ```
 
-## Desplegar en Cloudflare Pages
+## Desplegar en Cloudflare
 
 - Comando de compilación `npm run build`. Directorio de salida `dist/pages`.
+- Para el servicio Workers `floretum`, usa `npx wrangler deploy` como comando de despliegue. `wrangler.jsonc` publica `dist/pages` como archivos estáticos.
 - Para ejecutar la conversión de los PLY y el build anterior de forma local, usa `npm run build:local`.
 - Define `VITE_SCAN_BASE_URL` con la URL HTTPS del bucket R2 donde están `dalia-moco-full.spz` y `dalia-moco-full.points.bin`. El build usa el bucket `r2.dev` de prueba si omites esta variable. Para producción, configura el dominio personalizado del bucket.
-- En R2, permite `GET` desde el origen exacto de Pages. Para probar el build localmente, ejecuta `npm run preview -- --mode pages --configLoader native` y permite el origen que indique Vite (normalmente `http://localhost:4173`). El servidor de desarrollo también usa R2 y requiere permitir `http://localhost:3002` si lo abres en ese origen.
+- En R2, permite `GET` desde el origen exacto del sitio desplegado (`workers.dev`, `pages.dev` o el dominio personalizado). Para probar el build localmente, ejecuta `npm run preview -- --mode pages --configLoader native` y permite el origen que indique Vite (normalmente `http://localhost:4173`).
 - Para habilitar las consultas del asistente en Pages, define `VITE_DALIA_WEBHOOK_URL` con un webhook de producción accesible por HTTPS y que admita solicitudes desde el origen del sitio.
 
 # Escaneo completo de DALIA_MOCO
