@@ -1,7 +1,8 @@
 import { Vector3 } from 'three';
 
 const RECORD_BYTES = 16;
-const SAMPLE_RADIUS = 20;
+const SAMPLE_RADIUS = 80;
+const MAX_POINTER_POINTS = 350_000;
 
 export function samplePointCloud(points, camera, bounds, pointer) {
   const x = pointer.x - bounds.left;
@@ -13,7 +14,8 @@ export function samplePointCloud(points, camera, bounds, pointer) {
   let frontDepth = Infinity;
   camera.updateMatrixWorld();
 
-  for (let offset = 0; offset < points.byteLength; offset += RECORD_BYTES) {
+  const stride = RECORD_BYTES * Math.max(1, Math.ceil(points.byteLength / RECORD_BYTES / MAX_POINTER_POINTS));
+  for (let offset = 0; offset < points.byteLength; offset += stride) {
     position.set(
       points.getFloat32(offset, true),
       points.getFloat32(offset + 4, true),

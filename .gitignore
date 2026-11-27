@@ -7,4 +7,7 @@ dist/scans-web2/
 node_modules/
 public/scans/*.ksplat
 public/scans/*.points.bin
+public/scans/dalia-moco-full.splat
 
+!public/scans/dalia-moco.ksplat
+!public/scans/dalia-moco.points.bin

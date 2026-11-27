@@ -41,3 +41,13 @@ Para validar una versión de producción:
 ```bash
 npm run build
 ```
+# Escaneo completo de DALIA_MOCO
+
+Genera los archivos que usa el visor Spark desde el PLY binario de Houdini:
+
+```powershell
+node scripts/convert-dalia-full.mjs 'D:/CC/TESIS/Gaussians/cleanGaussians/dalia_MOCO.ply'
+npm run dev
+```
+
+La conversión guarda los 3,208,929 splats en `public/scans/dalia-moco-full.splat` y los puntos para el audio y los rayos X en `public/scans/dalia-moco-full.points.bin`. Los archivos se generan localmente y deben existir antes de compilar el sitio.

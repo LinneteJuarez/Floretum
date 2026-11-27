@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run convert:splats && vite build",
+    "convert:flowers": "node scripts/convert-houdini-splats.mjs",
     "preview": "vite preview",
     "convert:splats": "node scripts/convert-splats.mjs"
   },
   "dependencies": {
     "@mkkellogg/gaussian-splats-3d": "^0.4.7",
+    "@sparkjsdev/spark": "^2.4.0",
     "lenis": "^1.3.28",
     "lucide-react": "^1.80.0",
     "motion": "^14.14.0",
