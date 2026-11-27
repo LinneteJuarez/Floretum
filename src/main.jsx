@@ -239,6 +239,7 @@ function SplatViewer({ specimen }) {
         resizeObserver.observe(host);
         splat = new SplatMesh({
           url: `${import.meta.env.BASE_URL}scans/${specimen.file}`,
+          enableLod: false,
           onProgress: ({ loaded, total }) => {
             if (!cancelled && total) setProgress(Math.min(99, Math.round(100 * loaded / total)));
           },
@@ -246,6 +247,9 @@ function SplatViewer({ specimen }) {
         scene.add(spark, splat);
         await splat.initialized;
         if (cancelled) return;
+        if (splat.splats?.getNumSplats() !== specimen.splatCount) {
+          throw new Error('La carga de Spark no coincide con el conteo del escaneo.');
+        }
         host.appendChild(canvas);
         viewerRef.current = { camera };
         renderer.setAnimationLoop(() => {
